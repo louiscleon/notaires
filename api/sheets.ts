@@ -1,14 +1,5 @@
-import { google } from 'googleapis';
-import { GoogleAuth } from 'google-auth-library';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-
-const auth = new GoogleAuth({
-  credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '{}'),
-  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-});
-
-const sheets = google.sheets({ version: 'v4', auth });
-const SPREADSHEET_ID = process.env.REACT_APP_SPREADSHEET_ID;
+import { sheets, SPREADSHEET_ID } from './config';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!SPREADSHEET_ID) {
