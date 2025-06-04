@@ -9,13 +9,22 @@ export const setLoadingCallback = (callback: (loading: boolean) => void) => {
   loadingCallback = callback;
 };
 
+interface APIError {
+  error: string;
+  message?: string;
+  type?: string;
+}
+
 async function fetchWithError(url: string, options?: RequestInit) {
   const response = await fetch(url, options);
+  const data = await response.json().catch(() => ({ error: 'Failed to parse response' }));
+  
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    const error = data as APIError;
+    throw new Error(error.message || error.error || `HTTP error! status: ${response.status}`);
   }
-  return response.json();
+  
+  return data;
 }
 
 export async function readSheetData(range: string) {
