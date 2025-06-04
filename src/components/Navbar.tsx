@@ -23,13 +23,14 @@ const Navbar: React.FC<Props> = ({
   isMenuOpen = false
 }) => {
   return (
-    <nav className="bg-white shadow-lg sticky top-0 z-40 mobile-safe-top">
-      <div className="px-4 lg:px-8 h-16 flex items-center">
+    <nav className="bg-white shadow-lg sticky top-0 z-40 safe-area-top">
+      {/* Barre principale */}
+      <div className="px-4 lg:px-8 h-16 flex items-center justify-between">
         {/* Gauche */}
-        <div className="flex items-center flex-shrink-0">
+        <div className="flex items-center space-x-3">
           <button
             onClick={onMenuToggle}
-            className="touch-button p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-500"
+            className="touch-button -ml-2 p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-500"
           >
             <span className="sr-only">{isMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}</span>
             {isMenuOpen ? (
@@ -42,22 +43,26 @@ const Navbar: React.FC<Props> = ({
               </svg>
             )}
           </button>
-          <div className="flex items-center ml-3">
-            <div className="h-8 w-8">
+          <div className="flex items-center">
+            <div className="h-8 w-8 flex-shrink-0">
               <Logo className="w-full h-full text-teal-600" />
             </div>
-            <h1 className="ml-3 text-lg font-bold text-teal-600 truncate">
-              Le château de Greg et Louis
-            </h1>
+            <div className="ml-3">
+              <h1 className="text-base md:text-lg font-bold text-teal-600 leading-tight">
+                Le château de<br className="md:hidden" /> Greg et Louis
+              </h1>
+            </div>
           </div>
         </div>
 
         {/* Droite */}
-        <div className="flex items-center ml-auto space-x-4">
+        <div className="flex items-center space-x-2 md:space-x-4">
+          {/* Stats - visible uniquement sur desktop */}
           <span className="hidden md:inline text-sm text-gray-500 whitespace-nowrap">
             {notairesCount} notaire{notairesCount > 1 ? 's' : ''} sur {totalNotaires}
           </span>
 
+          {/* Boutons de vue - desktop */}
           <div className="hidden md:flex items-center bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => onViewModeChange('carte')}
@@ -81,26 +86,42 @@ const Navbar: React.FC<Props> = ({
             </button>
           </div>
 
-          <select
-            className="md:hidden touch-button pl-3 pr-10 py-2 text-sm border-gray-300 rounded-md"
-            value={viewMode}
-            onChange={(e) => onViewModeChange(e.target.value as 'carte' | 'liste')}
-          >
-            <option value="carte">🗺️ Carte</option>
-            <option value="liste">📋 Liste</option>
-          </select>
+          {/* Boutons de vue - mobile */}
+          <div className="md:hidden flex items-center bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => onViewModeChange('carte')}
+              className={`w-10 h-10 flex items-center justify-center rounded-md transition-colors duration-200 ${
+                viewMode === 'carte'
+                  ? 'bg-white text-gray-800 shadow'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              🗺️
+            </button>
+            <button
+              onClick={() => onViewModeChange('liste')}
+              className={`w-10 h-10 flex items-center justify-center rounded-md transition-colors duration-200 ${
+                viewMode === 'liste'
+                  ? 'bg-white text-gray-800 shadow'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              📋
+            </button>
+          </div>
 
+          {/* Bouton de synchronisation */}
           <button
             onClick={onSyncClick}
             disabled={isSyncing}
-            className={`touch-button flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 whitespace-nowrap ${
+            className={`touch-button w-10 h-10 md:w-auto md:h-auto md:px-3 md:py-2 flex items-center justify-center rounded-lg transition-colors duration-200 ${
               isSyncing
                 ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 : 'bg-teal-50 text-teal-600 hover:bg-teal-100'
             }`}
           >
             <svg
-              className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''} ${!isSyncing ? 'mr-2' : ''}`}
+              className={`w-5 h-5 md:w-4 md:h-4 ${isSyncing ? 'animate-spin' : ''} ${!isSyncing ? 'md:mr-2' : ''}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -120,7 +141,7 @@ const Navbar: React.FC<Props> = ({
       </div>
 
       {/* Stats mobile */}
-      <div className="md:hidden px-4 pb-2">
+      <div className="md:hidden px-4 pb-2 text-center">
         <span className="text-sm text-gray-500">
           {notairesCount} notaire{notairesCount > 1 ? 's' : ''} sur {totalNotaires}
         </span>
