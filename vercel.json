@@ -5,7 +5,11 @@
   "framework": "create-react-app",
   "functions": {
     "api/src/*.ts": {
-      "runtime": "@vercel/node@3.0.0"
+      "runtime": "@vercel/node@3.0.0",
+      "memory": 1024,
+      "maxDuration": 10
     }
-  }
+  },
+  "version": 2,
+  "nodeVersion": "18.x"
 } 
