@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/src/*.ts",
+      "src": "api/src/sheets.ts",
       "use": "@vercel/node"
     },
     {
@@ -15,12 +15,15 @@
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/src/$1"
+      "src": "/api/sheets",
+      "dest": "/api/src/sheets.ts"
+    },
+    {
+      "handle": "filesystem"
     },
     {
       "src": "/(.*)",
-      "dest": "/$1"
+      "dest": "/index.html"
     }
   ]
 } 
