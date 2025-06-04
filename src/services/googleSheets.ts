@@ -1,15 +1,3 @@
-import { google } from 'googleapis';
-import { GoogleAuth } from 'google-auth-library';
-
-const auth = new GoogleAuth({
-  keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH,
-  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-});
-
-const sheets = google.sheets({ version: 'v4', auth });
-
-const SPREADSHEET_ID = process.env.REACT_APP_SPREADSHEET_ID;
-
 interface SheetData {
   notaires: any[];
   villesInteret: any[];
@@ -56,11 +44,6 @@ export async function writeSheetData(range: string, values: any[][]) {
 
 export const googleSheetsService = {
   async loadFromSheet(): Promise<SheetData> {
-    if (!SPREADSHEET_ID) {
-      console.error('ID de la feuille Google manquant');
-      return { notaires: [], villesInteret: [] };
-    }
-
     try {
       const [notairesResponse, villesResponse] = await Promise.all([
         readSheetData('Notaires!A2:T'),
@@ -78,11 +61,6 @@ export const googleSheetsService = {
   },
 
   async saveToSheet(data: any[]): Promise<void> {
-    if (!SPREADSHEET_ID) {
-      console.error('ID de la feuille Google manquant');
-      return;
-    }
-
     try {
       await writeSheetData('Notaires!A2:T', data);
       console.log('Données sauvegardées avec succès');
