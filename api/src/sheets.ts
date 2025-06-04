@@ -1,6 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sheets, SPREADSHEET_ID } from './config';
 
+function safeStringify(obj: any): string {
+  try {
+    return JSON.stringify(obj, null, 2);
+  } catch (e) {
+    return '[Cannot stringify object]';
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Ensure we always send JSON responses
   res.setHeader('Content-Type', 'application/json');
@@ -14,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       method: req.method,
       query: req.query
     };
-    console.log('Environment check:', envState);
+    console.log('Environment check:', safeStringify(envState));
 
     // Validate environment variables
     if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
@@ -34,13 +42,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Validate service account JSON
+    let serviceAccount;
     try {
-      const serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
+      serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
+      console.log('Service account parsed:', {
+        type: serviceAccount.type,
+        hasPrivateKey: !!serviceAccount.private_key,
+        hasClientEmail: !!serviceAccount.client_email,
+        projectId: serviceAccount.project_id
+      });
+
       if (!serviceAccount.private_key || !serviceAccount.client_email) {
-        console.error('Invalid service account format');
+        console.error('Invalid service account format - missing required fields');
         return res.status(500).json({
           error: 'Configuration Error',
-          message: 'Invalid service account format'
+          message: 'Invalid service account format - missing required fields'
         });
       }
     } catch (e) {
@@ -61,26 +77,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
         }
 
-        console.log('Fetching data:', { range });
+        console.log('Fetching data:', { range, spreadsheetId: SPREADSHEET_ID });
         try {
           const response = await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
             range,
           });
 
-          console.log('Data fetched:', {
+          const result = {
             hasData: !!response.data.values,
             rowCount: response.data.values?.length || 0
-          });
+          };
+          console.log('Data fetched:', safeStringify(result));
 
           return res.status(200).json({
             data: response.data.values || []
           });
         } catch (e) {
-          console.error('Google Sheets API Error:', e);
+          const error = e as Error;
+          console.error('Google Sheets API Error:', {
+            message: error.message,
+            stack: error.stack,
+            error: safeStringify(error)
+          });
           return res.status(500).json({
             error: 'Google Sheets API Error',
-            message: e instanceof Error ? e.message : 'Failed to fetch data'
+            message: error.message || 'Failed to fetch data'
           });
         }
       }
@@ -94,7 +116,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
         }
 
-        console.log('Writing data:', { range: writeRange, valueCount: values.length });
+        console.log('Writing data:', {
+          range: writeRange,
+          valueCount: values.length,
+          spreadsheetId: SPREADSHEET_ID
+        });
+
         try {
           const writeResponse = await sheets.spreadsheets.values.update({
             spreadsheetId: SPREADSHEET_ID,
@@ -103,15 +130,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             requestBody: { values },
           });
 
-          console.log('Data written successfully');
+          console.log('Data written successfully:', safeStringify(writeResponse.data));
           return res.status(200).json({
             data: writeResponse.data
           });
         } catch (e) {
-          console.error('Google Sheets API Error:', e);
+          const error = e as Error;
+          console.error('Google Sheets API Error:', {
+            message: error.message,
+            stack: error.stack,
+            error: safeStringify(error)
+          });
           return res.status(500).json({
             error: 'Google Sheets API Error',
-            message: e instanceof Error ? e.message : 'Failed to write data'
+            message: error.message || 'Failed to write data'
           });
         }
       }
@@ -127,7 +159,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('Unexpected API Error:', {
       message: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
-      error
+      error: safeStringify(error)
     });
 
     // Send a detailed error response
