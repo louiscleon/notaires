@@ -35,8 +35,23 @@ async function fetchWithError<T>(url: string, options?: RequestInit): Promise<T>
   return (data as APIResponse<T>).data;
 }
 
+export async function testConfig() {
+  try {
+    const response = await fetch('/api/test');
+    const data = await response.json();
+    console.log('API Test Response:', data);
+    return data;
+  } catch (error) {
+    console.error('API Test Error:', error);
+    throw error;
+  }
+}
+
 export async function readSheetData(range: string) {
   try {
+    // Test configuration first
+    await testConfig();
+    
     return await fetchWithError<any[][]>(`/api/sheets?range=${encodeURIComponent(range)}`);
   } catch (error) {
     console.error('Erreur lors de la lecture des données:', error);
@@ -46,6 +61,9 @@ export async function readSheetData(range: string) {
 
 export async function writeSheetData(range: string, values: any[][]) {
   try {
+    // Test configuration first
+    await testConfig();
+
     return await fetchWithError<any>('/api/sheets', {
       method: 'POST',
       headers: {

@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/src/sheets.ts",
+      "src": "api/src/*.ts",
       "use": "@vercel/node"
     },
     {
@@ -14,6 +14,10 @@
     }
   ],
   "routes": [
+    {
+      "src": "/api/test",
+      "dest": "/api/src/test.ts"
+    },
     {
       "src": "/api/sheets",
       "dest": "/api/src/sheets.ts"
