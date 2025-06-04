@@ -10,6 +10,13 @@ const firebaseConfig = {
   appId: process.env.REACT_APP_FIREBASE_APP_ID
 };
 
+console.log('Configuration Firebase:', {
+  hasApiKey: !!firebaseConfig.apiKey,
+  hasAuthDomain: !!firebaseConfig.authDomain,
+  hasProjectId: !!firebaseConfig.projectId,
+  // Ne pas logger les valeurs réelles pour des raisons de sécurité
+});
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
@@ -17,36 +24,66 @@ provider.addScope('https://www.googleapis.com/auth/spreadsheets');
 
 export const signInWithGoogle = async () => {
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  console.log('Tentative de connexion Google sur:', isMobile ? 'mobile' : 'desktop');
+  
   try {
     if (isMobile) {
+      console.log('Démarrage de la redirection mobile...');
       await signInWithRedirect(auth, provider);
+      console.log('Redirection initiée'); // Ce log ne sera probablement jamais vu à cause de la redirection
     } else {
+      console.log('Ouverture de la popup de connexion...');
       const result = await signInWithPopup(auth, provider);
+      console.log('Connexion popup réussie');
       const credential = GoogleAuthProvider.credentialFromResult(result);
       return credential?.accessToken;
     }
-  } catch (error) {
-    console.error('Erreur d\'authentification:', error);
+  } catch (error: any) {
+    console.error('Erreur détaillée d\'authentification:', {
+      code: error.code,
+      message: error.message,
+      email: error.email,
+      credential: error.credential,
+      stack: error.stack
+    });
     throw error;
   }
 };
 
 export const handleRedirectResult = async () => {
+  console.log('Vérification du résultat de redirection...');
   try {
     const result = await getRedirectResult(auth);
+    console.log('Résultat de redirection reçu:', !!result);
+    
     if (result) {
+      console.log('Traitement du résultat de redirection...');
       const credential = GoogleAuthProvider.credentialFromResult(result);
+      console.log('Credential obtenu:', !!credential);
       return credential?.accessToken;
     }
     return null;
-  } catch (error) {
-    console.error('Erreur lors de la récupération du résultat de redirection:', error);
+  } catch (error: any) {
+    console.error('Erreur détaillée de redirection:', {
+      code: error.code,
+      message: error.message,
+      email: error.email,
+      credential: error.credential,
+      stack: error.stack
+    });
     throw error;
   }
 };
 
 export const getCurrentUser = () => {
-  return auth.currentUser;
+  const user = auth.currentUser;
+  console.log('Utilisateur actuel:', user ? 'connecté' : 'non connecté');
+  return user;
 };
+
+// Ajouter un listener pour les changements d'état d'authentification
+auth.onAuthStateChanged((user) => {
+  console.log('Changement d\'état d\'authentification:', user ? 'connecté' : 'déconnecté');
+});
 
 export { auth }; 

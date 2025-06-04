@@ -12,6 +12,7 @@ import { googleSheetsService } from './services/googleSheets';
 import Toast from './components/Toast';
 import { geocodeAddress } from './services/geocoding';
 import Logo from './components/Logo';
+import AuthWrapper from './components/AuthWrapper';
 
 interface ToastMessage {
   message: string;
@@ -308,120 +309,122 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 to-white">
-      {/* Toasts */}
-      <div className="fixed top-0 right-0 z-50 p-4 space-y-4 mobile-safe-top">
-        {toasts.map(toast => (
-          <Toast
-            key={toast.id}
-            message={toast.message}
-            type={toast.type}
-            onClose={() => removeToast(toast.id)}
-          />
-        ))}
-      </div>
-
-      {/* Overlay pour mobile */}
-      {isMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden" 
-          onClick={() => setIsMenuOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside 
-        className={`
-          fixed top-0 left-0 h-full w-80 bg-white shadow-lg z-40 transform transition-transform duration-300
-          ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-        `}
-      >
-        <div className="h-full overflow-y-auto">
-          <SidebarMenu
-            filtres={filtres}
-            onFiltresChange={handleFiltresChange}
-            notairesCount={notairesFiltres.length}
-            isOpen={isMenuOpen}
-            onToggle={() => setIsMenuOpen(!isMenuOpen)}
-          />
+    <AuthWrapper>
+      <div className="min-h-screen bg-gradient-to-br from-teal-50 to-white">
+        {/* Toasts */}
+        <div className="fixed top-0 right-0 z-50 p-4 space-y-4 mobile-safe-top">
+          {toasts.map(toast => (
+            <Toast
+              key={toast.id}
+              message={toast.message}
+              type={toast.type}
+              onClose={() => removeToast(toast.id)}
+            />
+          ))}
         </div>
-      </aside>
 
-      {/* Contenu principal */}
-      <main 
-        className={`
-          min-h-screen transition-all duration-300
-          ${isMenuOpen ? 'lg:pl-80' : ''}
-        `}
-      >
-        <Navbar
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          notairesCount={notairesFiltres.length}
-          totalNotaires={notaires.length}
-          isSyncing={isSyncing}
-          onSyncClick={synchronize}
-          onMenuToggle={() => setIsMenuOpen(!isMenuOpen)}
-          isMenuOpen={isMenuOpen}
-        />
+        {/* Overlay pour mobile */}
+        {isMenuOpen && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden" 
+            onClick={() => setIsMenuOpen(false)}
+          />
+        )}
 
-        <div className="p-4 lg:p-8">
-          {viewMode === 'carte' ? (
-            <div className="space-y-4 lg:space-y-8">
-              <div className="bg-white rounded-lg shadow-lg p-4">
-                <Dashboard 
-                  notaires={notaires} 
-                  onNotaireClick={handleNotaireClick}
-                />
-              </div>
-              <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-                <div className="h-[calc(100vh-16rem)] md:h-[600px] lg:h-[600px]">
-                  <MapComponent
-                    notaires={notairesFiltres}
-                    villesInteret={filtres.villesInteret}
+        {/* Sidebar */}
+        <aside 
+          className={`
+            fixed top-0 left-0 h-full w-80 bg-white shadow-lg z-40 transform transition-transform duration-300
+            ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+          `}
+        >
+          <div className="h-full overflow-y-auto">
+            <SidebarMenu
+              filtres={filtres}
+              onFiltresChange={handleFiltresChange}
+              notairesCount={notairesFiltres.length}
+              isOpen={isMenuOpen}
+              onToggle={() => setIsMenuOpen(!isMenuOpen)}
+            />
+          </div>
+        </aside>
+
+        {/* Contenu principal */}
+        <main 
+          className={`
+            min-h-screen transition-all duration-300
+            ${isMenuOpen ? 'lg:pl-80' : ''}
+          `}
+        >
+          <Navbar
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            notairesCount={notairesFiltres.length}
+            totalNotaires={notaires.length}
+            isSyncing={isSyncing}
+            onSyncClick={synchronize}
+            onMenuToggle={() => setIsMenuOpen(!isMenuOpen)}
+            isMenuOpen={isMenuOpen}
+          />
+
+          <div className="p-4 lg:p-8">
+            {viewMode === 'carte' ? (
+              <div className="space-y-4 lg:space-y-8">
+                <div className="bg-white rounded-lg shadow-lg p-4">
+                  <Dashboard 
+                    notaires={notaires} 
                     onNotaireClick={handleNotaireClick}
-                    onNotaireUpdate={handleNotaireUpdate}
-                    showOnlyInRadius={filtres.showOnlyInRadius}
+                  />
+                </div>
+                <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+                  <div className="h-[calc(100vh-16rem)] md:h-[600px] lg:h-[600px]">
+                    <MapComponent
+                      notaires={notairesFiltres}
+                      villesInteret={filtres.villesInteret}
+                      onNotaireClick={handleNotaireClick}
+                      onNotaireUpdate={handleNotaireUpdate}
+                      showOnlyInRadius={filtres.showOnlyInRadius}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 lg:space-y-8">
+                <div className="bg-white rounded-lg shadow-lg p-4">
+                  <Dashboard 
+                    notaires={notaires}
+                    onNotaireClick={handleNotaireClick}
+                  />
+                </div>
+                <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+                  <NotairesTable
+                    notaires={notairesFiltres}
+                    onNotaireClick={handleNotaireClick}
+                    onStatutChange={handleStatutChange}
                   />
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="space-y-4 lg:space-y-8">
-              <div className="bg-white rounded-lg shadow-lg p-4">
-                <Dashboard 
-                  notaires={notaires}
-                  onNotaireClick={handleNotaireClick}
-                />
-              </div>
-              <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-                <NotairesTable
-                  notaires={notairesFiltres}
-                  onNotaireClick={handleNotaireClick}
-                  onStatutChange={handleStatutChange}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </main>
-
-      {/* Modal */}
-      {selectedNotaire && (
-        <div className="fixed inset-0 z-[60] overflow-y-auto">
-          <div className="flex min-h-screen items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <NotaireModal
-              isOpen={true}
-              notaire={selectedNotaire}
-              onClose={handleCloseModal}
-              onSave={handleNotaireUpdate}
-              isEditing={isEditing}
-              setIsEditing={setIsEditing}
-            />
+            )}
           </div>
-        </div>
-      )}
-    </div>
+        </main>
+
+        {/* Modal */}
+        {selectedNotaire && (
+          <div className="fixed inset-0 z-[60] overflow-y-auto">
+            <div className="flex min-h-screen items-end justify-center p-4 text-center sm:items-center sm:p-0">
+              <NotaireModal
+                isOpen={true}
+                notaire={selectedNotaire}
+                onClose={handleCloseModal}
+                onSave={handleNotaireUpdate}
+                isEditing={isEditing}
+                setIsEditing={setIsEditing}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </AuthWrapper>
   );
 };
 

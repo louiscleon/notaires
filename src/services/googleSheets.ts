@@ -1,5 +1,6 @@
 import { Notaire, VilleInteret, NotaireStatut } from '../types';
-import { signInWithGoogle, handleRedirectResult } from './firebaseConfig';
+import { signInWithGoogle, handleRedirectResult, auth } from './firebaseConfig';
+import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 
 // Variables d'environnement avec valeurs par défaut pour le développement
 if (process.env.NODE_ENV === 'development') {
@@ -77,6 +78,12 @@ interface SheetData {
   notaires: Notaire[];
   villesInteret: VilleInteret[];
 }
+
+let loadingCallback: ((loading: boolean) => void) | null = null;
+
+export const setLoadingCallback = (callback: (loading: boolean) => void) => {
+  loadingCallback = callback;
+};
 
 export const googleSheetsService = {
   isConfigured: false,
@@ -208,69 +215,47 @@ export const googleSheetsService = {
   },
 
   async initAuth() {
-    if (this.authInProgress && this.authPromise) {
-      console.log('Authentification déjà en cours, attente...');
-      return this.authPromise;
-    }
+    if (loadingCallback) loadingCallback(true);
+    console.log('Démarrage de l\'authentification...');
 
     try {
       if (!this.checkConfiguration()) {
         throw new Error('Configuration Google Sheets incomplète');
       }
 
-      this.authInProgress = true;
-      this.authPromise = new Promise<void>(async (resolve, reject) => {
-        try {
-          // Vérifier d'abord le token stocké
-          const storedToken = this.getTokenFromLocalStorage();
-          if (storedToken) {
-            this.accessToken = storedToken;
-            window.gapi.client.setToken({ access_token: storedToken });
-            this.authInProgress = false;
-            this.authPromise = null;
-            resolve();
-            return;
-          }
+      await this.loadGapiScript();
+      console.log('Scripts Google chargés');
 
-          // Vérifier si nous revenons d'une redirection
-          const redirectToken = await handleRedirectResult();
-          if (redirectToken) {
-            this.accessToken = redirectToken;
-            window.gapi.client.setToken({ access_token: redirectToken });
-            this.saveTokenToLocalStorage(redirectToken);
-            this.authInProgress = false;
-            this.authPromise = null;
-            resolve();
-            return;
-          }
-
-          // Sinon, lancer une nouvelle authentification
-          const token = await signInWithGoogle();
-          if (token) {
-            this.accessToken = token;
-            window.gapi.client.setToken({ access_token: token });
-            this.saveTokenToLocalStorage(token);
-            resolve();
-          } else {
-            reject(new Error('Pas de token reçu'));
-          }
-        } catch (error) {
-          console.error('Erreur lors de l\'authentification:', error);
-          reject(error);
-        } finally {
-          this.authInProgress = false;
-          this.authPromise = null;
+      const authResult = await getRedirectResult(auth);
+      if (authResult?.user) {
+        console.log('Utilisateur authentifié après redirection');
+        const credential = GoogleAuthProvider.credentialFromResult(authResult);
+        if (credential?.accessToken) {
+          this.accessToken = credential.accessToken;
+          this.saveTokenToLocalStorage(credential.accessToken);
+          if (loadingCallback) loadingCallback(false);
+          return;
         }
-      });
+      }
 
-      return this.authPromise;
+      // Si pas de résultat de redirection, vérifier le token stocké
+      const storedToken = this.getTokenFromLocalStorage();
+      if (storedToken) {
+        console.log('Token stocké trouvé');
+        this.accessToken = storedToken;
+        if (loadingCallback) loadingCallback(false);
+        return;
+      }
 
+      // Si pas de token stocké, démarrer l'authentification
+      console.log('Démarrage de l\'authentification Google...');
+      const provider = new GoogleAuthProvider();
+      provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+      await signInWithRedirect(auth, provider);
+      
     } catch (error) {
-      this.authInProgress = false;
-      this.authPromise = null;
-      console.error('Erreur lors de l\'initialisation de l\'authentification:', error);
-      this.tokenClient = null;
-      this.clearTokens();
+      console.error('Erreur d\'authentification:', error);
+      if (loadingCallback) loadingCallback(false);
       throw error;
     }
   },
