@@ -226,3 +226,46 @@ Application de gestion des notaires.
 ## Déploiement
 
 Cette application est automatiquement déployée sur Vercel à chaque push sur la branche main.
+
+## Configuration
+
+### Variables d'environnement requises
+
+1. `REACT_APP_SPREADSHEET_ID` : L'ID de votre Google Sheet
+2. `GOOGLE_SERVICE_ACCOUNT_KEY_PATH` : Le chemin vers votre fichier de compte de service Google (en développement local) ou le contenu du JSON (sur Vercel)
+
+### Configuration du développement local
+
+1. Créez un fichier `.env` à la racine du projet avec les variables ci-dessus
+2. Placez votre fichier `service-account-key.json` à la racine du projet
+
+### Configuration Vercel
+
+Dans les paramètres de votre projet Vercel :
+1. Ajoutez `REACT_APP_SPREADSHEET_ID`
+2. Ajoutez `GOOGLE_SERVICE_ACCOUNT_KEY_PATH` avec le contenu complet du fichier JSON de compte de service
+
+## Installation
+
+```bash
+npm install
+```
+
+## Développement
+
+```bash
+npm start
+```
+
+## Production
+
+```bash
+npm run build
+```
+
+## Accès aux données
+
+L'application utilise maintenant un compte de service Google pour accéder aux données, ce qui signifie :
+- Pas de connexion utilisateur requise
+- Accès direct aux données
+- Pas de redirection à l'ouverture de l'application

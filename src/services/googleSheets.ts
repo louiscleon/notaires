@@ -1,6 +1,7 @@
 import { Notaire, VilleInteret, NotaireStatut } from '../types';
 import { signInWithGoogle, handleRedirectResult, auth } from './firebaseConfig';
 import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { google } from 'googleapis';
 
 // Variables d'environnement avec valeurs par défaut pour le développement
 if (process.env.NODE_ENV === 'development') {
@@ -84,6 +85,41 @@ let loadingCallback: ((loading: boolean) => void) | null = null;
 export const setLoadingCallback = (callback: (loading: boolean) => void) => {
   loadingCallback = callback;
 };
+
+// Initialisation du client Google Sheets avec le compte de service
+const sheets = google.sheets({ version: 'v4', auth });
+
+// Fonction pour lire les données d'une feuille
+export async function readSheetData(spreadsheetId: string, range: string) {
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range,
+    });
+    return response.data.values;
+  } catch (error) {
+    console.error('Erreur lors de la lecture des données:', error);
+    throw error;
+  }
+}
+
+// Fonction pour écrire des données dans une feuille
+export async function writeSheetData(spreadsheetId: string, range: string, values: any[][]) {
+  try {
+    const response = await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Erreur lors de l\'écriture des données:', error);
+    throw error;
+  }
+}
 
 export const googleSheetsService = {
   isConfigured: false,

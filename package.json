@@ -12,7 +12,8 @@
     "axios": "^1.9.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",
-    "firebase": "^11.8.1",
+    "google-auth-library": "^9.15.1",
+    "googleapis": "^149.0.0",
     "jsonwebtoken": "^9.0.2",
     "leaflet": "^1.9.0",
     "postcss": "^8.4.0",
@@ -21,7 +22,10 @@
     "react-leaflet": "^4.2.1",
     "react-scripts": "5.0.1",
     "tailwindcss": "^3.3.0",
-    "web-vitals": "^5.0.2"
+    "web-vitals": "^5.0.2",
+    "firebase": null,
+    "@firebase/app": null,
+    "@firebase/auth": null
   },
   "scripts": {
     "start": "react-scripts start",
