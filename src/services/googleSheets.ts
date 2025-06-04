@@ -3,6 +3,100 @@ interface SheetData {
   villesInteret: any[];
 }
 
+interface Notaire {
+  id: string;
+  officeNotarial: string;
+  adresse: string;
+  codePostal: string;
+  ville: string;
+  departement: string;
+  email: string;
+  notairesAssocies: string;
+  notairesSalaries: string;
+  nbAssocies: number;
+  nbSalaries: number;
+  serviceNego: boolean;
+  statut: string;
+  notes: string;
+  contacts: any[];
+  dateModification: string;
+  latitude?: number;
+  longitude?: number;
+  geoScore?: number;
+  geocodingHistory?: any[];
+}
+
+interface VilleInteret {
+  id: string;
+  nom: string;
+  rayon: number;
+  latitude: number;
+  longitude: number;
+  departement: string;
+  population?: number;
+}
+
+function parseNotaire(row: any[]): Notaire {
+  const [
+    id,
+    officeNotarial,
+    adresse,
+    codePostal,
+    ville,
+    departement,
+    email,
+    notairesAssocies,
+    notairesSalaries,
+    nbAssocies,
+    nbSalaries,
+    serviceNego,
+    statut,
+    notes,
+    contacts,
+    dateModification,
+    latitude,
+    longitude,
+    geoScore,
+    geocodingHistory
+  ] = row;
+
+  return {
+    id: id || `notaire_${Date.now()}`,
+    officeNotarial: officeNotarial || '',
+    adresse: adresse || '',
+    codePostal: codePostal || '',
+    ville: ville || '',
+    departement: departement || '',
+    email: email || '',
+    notairesAssocies: notairesAssocies || '',
+    notairesSalaries: notairesSalaries || '',
+    nbAssocies: parseInt(nbAssocies) || 0,
+    nbSalaries: parseInt(nbSalaries) || 0,
+    serviceNego: serviceNego === 'oui',
+    statut: statut || 'nouveau',
+    notes: notes || '',
+    contacts: contacts ? JSON.parse(contacts) : [],
+    dateModification: dateModification || new Date().toISOString(),
+    latitude: latitude ? parseFloat(latitude) : undefined,
+    longitude: longitude ? parseFloat(longitude) : undefined,
+    geoScore: geoScore ? parseFloat(geoScore) : undefined,
+    geocodingHistory: geocodingHistory ? JSON.parse(geocodingHistory) : []
+  };
+}
+
+function parseVilleInteret(row: any[]): VilleInteret {
+  const [id, nom, rayon, latitude, longitude, departement, population] = row;
+  return {
+    id: id || `ville_${Date.now()}`,
+    nom: nom || '',
+    rayon: parseFloat(rayon) || 15,
+    latitude: parseFloat(latitude) || 0,
+    longitude: parseFloat(longitude) || 0,
+    departement: departement || '',
+    population: population ? parseInt(population) : undefined
+  };
+}
+
 let loadingCallback: ((loading: boolean) => void) | null = null;
 
 export const setLoadingCallback = (callback: (loading: boolean) => void) => {
@@ -96,19 +190,25 @@ export const googleSheetsService = {
   async loadFromSheet(): Promise<SheetData> {
     try {
       console.log('Loading data from sheets...');
-      const [notairesResponse, villesResponse] = await Promise.all([
+      const [notairesRows, villesRows] = await Promise.all([
         readSheetData('Notaires!A2:T'),
         readSheetData('VillesInteret!A2:G')
       ]);
 
+      // Parse les données en objets structurés
+      const notaires = (notairesRows || []).map(parseNotaire);
+      const villesInteret = (villesRows || []).map(parseVilleInteret);
+
       console.log('Data loaded:', {
-        notairesCount: notairesResponse?.length || 0,
-        villesCount: villesResponse?.length || 0
+        notairesCount: notaires.length,
+        villesCount: villesInteret.length,
+        sampleNotaire: notaires[0],
+        sampleVille: villesInteret[0]
       });
 
       return {
-        notaires: notairesResponse || [],
-        villesInteret: villesResponse || []
+        notaires,
+        villesInteret
       };
     } catch (error) {
       console.error('Erreur lors du chargement:', error);
