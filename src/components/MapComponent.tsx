@@ -23,10 +23,10 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 const MapCenterController: React.FC<{ villesInteret: VilleInteret[] }> = ({ villesInteret }) => {
   const map = useMap();
   
-  // Définition des limites englobant la Bretagne et le Maine-et-Loire
+  // Définition des limites englobant la Bretagne et les Pays de la Loire
   const defaultBounds = useMemo<L.LatLngBoundsExpression>(() => ([
-    [49.2, -5.5], // Nord-Ouest (pointe du Finistère)
-    [46.5, 0.0]  // Sud-Est (Maine-et-Loire)
+    [49.0, -5.2], // Nord-Ouest (pointe du Finistère)
+    [46.8, -0.2]  // Sud-Est (Pays de la Loire)
   ]), []);
 
   // Calcul des bounds pour les villes d'intérêt
@@ -68,7 +68,7 @@ const ResetViewControl: React.FC = () => {
   const map = useMap();
   const defaultBounds: L.LatLngBoundsExpression = [
     [49.0, -5.2], // Nord-Ouest (pointe du Finistère)
-    [46.8, -0.5]  // Sud-Est (Maine-et-Loire)
+    [46.8, -0.2]  // Sud-Est (Pays de la Loire)
   ];
 
   return (
@@ -77,7 +77,7 @@ const ResetViewControl: React.FC = () => {
         <button
           onClick={() => map.fitBounds(defaultBounds, {
             padding: [50, 50],
-            maxZoom: 9
+            maxZoom: 8
           })}
           className="px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg flex items-center gap-2"
         >
@@ -99,7 +99,7 @@ const MapComponent: React.FC<Props> = ({
   onNotaireUpdate,
   showOnlyInRadius = false
 }) => {
-  const [center] = useState<[number, number]>([48.133333, -2.233333]);
+  const [center] = useState<[number, number]>([47.8, -2.8]);
   const [initialZoom] = useState(8);
   const [notairesAvecCoordonnees, setNotairesAvecCoordonnees] = useState<Notaire[]>([]);
   const [loading, setLoading] = useState(false);

@@ -9,6 +9,7 @@ const SPREADSHEET_ID = process.env.REACT_APP_SPREADSHEET_ID || '16b_CqogHI5-L-nH
 const CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
 const API_KEY = process.env.REACT_APP_GOOGLE_SHEETS_API_KEY || '';
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
+const REDIRECT_URI = window.location.origin;
 
 const HEADERS = [
   'ID',
@@ -67,7 +68,6 @@ interface SpreadsheetsGetResponse {
 interface TokenClient {
   requestAccessToken(options?: { 
     prompt?: string;
-    ux_mode?: 'popup' | 'redirect';
   }): void;
 }
 
@@ -89,6 +89,7 @@ export const googleSheetsService = {
   authRetryCount: 0,
   MAX_AUTH_RETRIES: 3,
   AUTH_TIMEOUT: 60000, // 60 secondes
+  redirectInProgress: false,
 
   checkConfiguration() {
     if (!SPREADSHEET_ID || !CLIENT_ID || !API_KEY) {
@@ -192,7 +193,25 @@ export const googleSheetsService = {
     this.accessToken = null;
   },
 
+  handleRedirectCallback() {
+    // Vérifier si nous revenons d'une redirection OAuth
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    if (code) {
+      this.redirectInProgress = true;
+      // Nettoyer l'URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return true;
+    }
+    return false;
+  },
+
   async initAuth() {
+    // Vérifier si nous revenons d'une redirection
+    if (this.handleRedirectCallback()) {
+      console.log('Retour de redirection OAuth détecté');
+    }
+
     // Si une authentification est déjà en cours, retourner la promesse existante
     if (this.authInProgress && this.authPromise) {
       console.log('Authentification déjà en cours, attente...');
@@ -210,6 +229,7 @@ export const googleSheetsService = {
           this.authInProgress = false;
           this.authPromise = null;
           this.authRetryCount = 0;
+          this.redirectInProgress = false;
         };
 
         const retryAuth = () => {
@@ -222,47 +242,24 @@ export const googleSheetsService = {
           this.authRetryCount++;
           console.log(`Tentative d'authentification ${this.authRetryCount}/${this.MAX_AUTH_RETRIES}`);
 
-          // Ensure GAPI is loaded first
           this.loadGapiScript()
             .then(() => {
               console.log('Initialisation du client d\'authentification...');
 
-              // Check if we have a stored token that's still valid
-              const storedToken = localStorage.getItem('googleAccessToken');
-              const tokenTimestamp = localStorage.getItem('tokenTimestamp');
-              const tokenAge = tokenTimestamp ? Date.now() - parseInt(tokenTimestamp) : Infinity;
-              
-              if (storedToken && tokenAge < 3600000) { // Token less than 1 hour old
-                this.accessToken = storedToken;
-                window.gapi.client.setToken({ access_token: storedToken });
-                cleanup();
-                resolve();
-                return;
-              }
-
-              // Initialize the token client
-              if (!CLIENT_ID) {
-                throw new Error('CLIENT_ID non défini');
-              }
-
-              // Détecter si on est sur mobile
-              const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-              
+              // Initialisation du client d'authentification
               this.tokenClient = window.google.accounts.oauth2.initTokenClient({
                 client_id: CLIENT_ID,
                 scope: SCOPES.join(' '),
                 callback: (response: TokenResponse) => {
                   if (response.error) {
-                    console.error('Erreur d\'authentification Google:', response.error);
+                    console.error('Erreur d\'authentification:', response.error);
                     setTimeout(retryAuth, 2000);
                     return;
                   }
                   
                   if (response.access_token) {
                     this.accessToken = response.access_token;
-                    window.gapi.client.setToken({ access_token: response.access_token });
-                    localStorage.setItem('googleAccessToken', response.access_token);
-                    localStorage.setItem('tokenTimestamp', Date.now().toString());
+                    this.saveTokenToLocalStorage(response.access_token);
                     cleanup();
                     resolve();
                   } else {
@@ -271,19 +268,9 @@ export const googleSheetsService = {
                 }
               });
 
-              const timeoutId = setTimeout(() => {
-                if (this.authInProgress) {
-                  console.log('Timeout d\'authentification, nouvelle tentative...');
-                  clearTimeout(timeoutId);
-                  retryAuth();
-                }
-              }, this.AUTH_TIMEOUT);
-
               if (this.tokenClient) {
-                // Sur mobile, forcer la redirection plutôt que la popup
                 this.tokenClient.requestAccessToken({
-                  prompt: this.authRetryCount > 0 ? 'consent' : undefined,
-                  ...(isMobile && { ux_mode: 'redirect' })
+                  prompt: 'consent'
                 });
               }
             })
@@ -302,6 +289,7 @@ export const googleSheetsService = {
       this.authInProgress = false;
       this.authPromise = null;
       this.authRetryCount = 0;
+      this.redirectInProgress = false;
       console.error('Erreur lors de l\'initialisation de l\'authentification:', error);
       this.tokenClient = null;
       this.clearTokens();
@@ -995,5 +983,5 @@ export const googleSheetsService = {
       console.error('Erreur lors du nettoyage profond:', error);
       throw error;
     }
-  }
-}; 
+  },
+};
