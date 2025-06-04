@@ -65,7 +65,10 @@ interface SpreadsheetsGetResponse {
 }
 
 interface TokenClient {
-  requestAccessToken(options?: { prompt?: string }): void;
+  requestAccessToken(options?: { 
+    prompt?: string;
+    ux_mode?: 'popup' | 'redirect';
+  }): void;
 }
 
 // Types essentiels uniquement
@@ -241,6 +244,9 @@ export const googleSheetsService = {
               if (!CLIENT_ID) {
                 throw new Error('CLIENT_ID non défini');
               }
+
+              // Détecter si on est sur mobile
+              const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
               
               this.tokenClient = window.google.accounts.oauth2.initTokenClient({
                 client_id: CLIENT_ID,
@@ -248,7 +254,6 @@ export const googleSheetsService = {
                 callback: (response: TokenResponse) => {
                   if (response.error) {
                     console.error('Erreur d\'authentification Google:', response.error);
-                    // Retry on error
                     setTimeout(retryAuth, 2000);
                     return;
                   }
@@ -261,35 +266,33 @@ export const googleSheetsService = {
                     cleanup();
                     resolve();
                   } else {
-                    // Retry if no token received
                     setTimeout(retryAuth, 2000);
                   }
                 }
               });
 
-              // Request a new token with a timeout
               const timeoutId = setTimeout(() => {
                 if (this.authInProgress) {
                   console.log('Timeout d\'authentification, nouvelle tentative...');
-                  clearTimeout(timeoutId); // Nettoyage du timeout
+                  clearTimeout(timeoutId);
                   retryAuth();
                 }
               }, this.AUTH_TIMEOUT);
 
               if (this.tokenClient) {
+                // Sur mobile, forcer la redirection plutôt que la popup
                 this.tokenClient.requestAccessToken({
-                  prompt: this.authRetryCount > 0 ? 'consent' : undefined
+                  prompt: this.authRetryCount > 0 ? 'consent' : undefined,
+                  ...(isMobile && { ux_mode: 'redirect' })
                 });
               }
             })
             .catch((error) => {
               console.error('Erreur lors du chargement des scripts:', error);
-              // Retry on script loading error
               setTimeout(retryAuth, 2000);
             });
         };
 
-        // Start the first attempt
         retryAuth();
       });
 

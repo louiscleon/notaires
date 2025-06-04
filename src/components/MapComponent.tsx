@@ -25,8 +25,8 @@ const MapCenterController: React.FC<{ villesInteret: VilleInteret[] }> = ({ vill
   
   // Définition des limites englobant la Bretagne et le Maine-et-Loire
   const defaultBounds = useMemo<L.LatLngBoundsExpression>(() => ([
-    [49.0, -5.2], // Nord-Ouest (pointe du Finistère)
-    [46.8, -0.5]  // Sud-Est (Maine-et-Loire)
+    [49.2, -5.5], // Nord-Ouest (pointe du Finistère)
+    [46.5, 0.0]  // Sud-Est (Maine-et-Loire)
   ]), []);
 
   // Calcul des bounds pour les villes d'intérêt
@@ -341,7 +341,7 @@ const MapComponent: React.FC<Props> = ({
           center={center}
           zoom={initialZoom}
           className="w-full h-full"
-          style={{ height: 'calc(100vh - 64px)', zIndex: 0 }}
+          style={{ height: 'calc(100vh - 64px)', width: '100%', position: 'relative' }}
           zoomControl={true}
           scrollWheelZoom={true}
           minZoom={7}
@@ -424,6 +424,8 @@ const MapComponent: React.FC<Props> = ({
         <style>{`
           .leaflet-container {
             z-index: 0;
+            width: 100% !important;
+            height: 100% !important;
           }
           .leaflet-popup {
             z-index: 1;
