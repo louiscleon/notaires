@@ -23,12 +23,13 @@ export const setLoadingCallback = (callback: (loading: boolean) => void) => {
 
 export async function readSheetData(range: string) {
   try {
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range,
-    });
-    return response.data.values;
-    } catch (error) {
+    const response = await fetch(`/api/sheets?range=${encodeURIComponent(range)}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
     console.error('Erreur lors de la lecture des données:', error);
     throw error;
   }
@@ -36,17 +37,21 @@ export async function readSheetData(range: string) {
 
 export async function writeSheetData(range: string, values: any[][]) {
   try {
-    const response = await sheets.spreadsheets.values.update({
-          spreadsheetId: SPREADSHEET_ID,
-      range,
-      valueInputOption: 'USER_ENTERED',
-      requestBody: { values },
-        });
-    return response.data;
-      } catch (error) {
-    console.error('Erreur lors de l\'écriture des données:', error);
-      throw error;
+    const response = await fetch('/api/sheets', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ range, values }),
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+    return await response.json();
+  } catch (error) {
+    console.error('Erreur lors de l\'écriture des données:', error);
+    throw error;
+  }
 }
 
 export const googleSheetsService = {
