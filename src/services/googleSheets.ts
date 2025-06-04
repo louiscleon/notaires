@@ -11,25 +11,33 @@ export const setLoadingCallback = (callback: (loading: boolean) => void) => {
 
 interface APIError {
   error: string;
-  message?: string;
-  type?: string;
+  message: string;
 }
 
-async function fetchWithError(url: string, options?: RequestInit) {
+interface APIResponse<T> {
+  data: T;
+}
+
+async function fetchWithError<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, options);
-  const data = await response.json().catch(() => ({ error: 'Failed to parse response' }));
-  
+  let data;
+  try {
+    data = await response.json();
+  } catch (e) {
+    throw new Error('Failed to parse server response');
+  }
+
   if (!response.ok) {
     const error = data as APIError;
     throw new Error(error.message || error.error || `HTTP error! status: ${response.status}`);
   }
-  
-  return data;
+
+  return (data as APIResponse<T>).data;
 }
 
 export async function readSheetData(range: string) {
   try {
-    return await fetchWithError(`/api/sheets?range=${encodeURIComponent(range)}`);
+    return await fetchWithError<any[][]>(`/api/sheets?range=${encodeURIComponent(range)}`);
   } catch (error) {
     console.error('Erreur lors de la lecture des données:', error);
     throw error;
@@ -38,7 +46,7 @@ export async function readSheetData(range: string) {
 
 export async function writeSheetData(range: string, values: any[][]) {
   try {
-    return await fetchWithError('/api/sheets', {
+    return await fetchWithError<any>('/api/sheets', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
