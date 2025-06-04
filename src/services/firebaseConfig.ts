@@ -21,6 +21,11 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+provider.setCustomParameters({
+  prompt: 'select_account',
+  // Forcer l'utilisation du domaine de l'application
+  redirect_uri: window.location.origin
+});
 
 export const signInWithGoogle = async () => {
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -30,7 +35,7 @@ export const signInWithGoogle = async () => {
     if (isMobile) {
       console.log('Démarrage de la redirection mobile...');
       await signInWithRedirect(auth, provider);
-      console.log('Redirection initiée'); // Ce log ne sera probablement jamais vu à cause de la redirection
+      console.log('Redirection initiée');
     } else {
       console.log('Ouverture de la popup de connexion...');
       const result = await signInWithPopup(auth, provider);
