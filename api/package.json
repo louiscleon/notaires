@@ -2,6 +2,9 @@
   "name": "notaires-api",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "18.x"
+  },
   "dependencies": {
     "@vercel/node": "^3.0.0",
     "google-auth-library": "^9.0.0",
