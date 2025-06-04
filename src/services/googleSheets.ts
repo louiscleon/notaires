@@ -28,7 +28,7 @@ export async function readSheetData(range: string) {
       range,
     });
     return response.data.values;
-  } catch (error) {
+    } catch (error) {
     console.error('Erreur lors de la lecture des données:', error);
     throw error;
   }
@@ -37,16 +37,16 @@ export async function readSheetData(range: string) {
 export async function writeSheetData(range: string, values: any[][]) {
   try {
     const response = await sheets.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
+          spreadsheetId: SPREADSHEET_ID,
       range,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values },
-    });
+        });
     return response.data;
-  } catch (error) {
+      } catch (error) {
     console.error('Erreur lors de l\'écriture des données:', error);
-    throw error;
-  }
+      throw error;
+    }
 }
 
 export const googleSheetsService = {
