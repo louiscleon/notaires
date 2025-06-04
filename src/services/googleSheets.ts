@@ -23,7 +23,9 @@ async function fetchWithError<T>(url: string, options?: RequestInit): Promise<T>
   let data;
   try {
     data = await response.json();
+    console.log('API Response:', data);
   } catch (e) {
+    console.error('Failed to parse response:', e);
     throw new Error('Failed to parse server response');
   }
 
@@ -32,7 +34,12 @@ async function fetchWithError<T>(url: string, options?: RequestInit): Promise<T>
     throw new Error(error.message || error.error || `HTTP error! status: ${response.status}`);
   }
 
-  return (data as APIResponse<T>).data;
+  if (!data.data) {
+    console.error('Invalid response format:', data);
+    throw new Error('Invalid response format: missing data property');
+  }
+
+  return data.data as T;
 }
 
 export async function testConfig() {
@@ -49,10 +56,15 @@ export async function testConfig() {
 
 export async function readSheetData(range: string) {
   try {
-    // Test configuration first
-    await testConfig();
-    
-    return await fetchWithError<any[][]>(`/api/sheets?range=${encodeURIComponent(range)}`);
+    console.log('Reading sheet data:', { range });
+    const data = await fetchWithError<any[][]>(`/api/sheets?range=${encodeURIComponent(range)}`);
+    console.log('Sheet data received:', {
+      hasData: !!data,
+      rowCount: data?.length || 0,
+      firstRow: data?.[0],
+      lastRow: data?.[data.length - 1]
+    });
+    return data;
   } catch (error) {
     console.error('Erreur lors de la lecture des données:', error);
     throw error;
@@ -61,9 +73,12 @@ export async function readSheetData(range: string) {
 
 export async function writeSheetData(range: string, values: any[][]) {
   try {
-    // Test configuration first
-    await testConfig();
-
+    console.log('Writing sheet data:', {
+      range,
+      valueCount: values.length,
+      firstRow: values[0],
+      lastRow: values[values.length - 1]
+    });
     return await fetchWithError<any>('/api/sheets', {
       method: 'POST',
       headers: {
@@ -80,10 +95,16 @@ export async function writeSheetData(range: string, values: any[][]) {
 export const googleSheetsService = {
   async loadFromSheet(): Promise<SheetData> {
     try {
+      console.log('Loading data from sheets...');
       const [notairesResponse, villesResponse] = await Promise.all([
         readSheetData('Notaires!A2:T'),
         readSheetData('VillesInteret!A2:G')
       ]);
+
+      console.log('Data loaded:', {
+        notairesCount: notairesResponse?.length || 0,
+        villesCount: villesResponse?.length || 0
+      });
 
       return {
         notaires: notairesResponse || [],
