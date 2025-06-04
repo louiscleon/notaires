@@ -57,6 +57,80 @@ const NotairesTable: React.FC<Props> = ({ notaires, onNotaireClick, selectedNota
     });
   }, [notaires, searchQuery]);
 
+  const renderStatusButton = (notaire: Notaire) => (
+    <button
+      onClick={(e) => handleStatutClick(e, notaire)}
+      className="touch-button flex items-center space-x-2 hover:bg-gray-100 rounded-lg px-2 py-1 transition-colors duration-150"
+    >
+      <span className="text-xl" title={statusLabels[notaire.statut]}>
+        {statusIcons[notaire.statut]}
+      </span>
+      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    </button>
+  );
+
+  const renderStatusMenu = (notaire: Notaire) => (
+    openStatusMenu === notaire.id && (
+      <div className="absolute z-50 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 border border-gray-200">
+        {Object.entries(statusLabels).map(([value, label]) => (
+          <button
+            key={value}
+            onClick={(e) => handleStatutChange(e, notaire, value as NotaireStatut)}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+          >
+            <span>{statusIcons[value as NotaireStatut]}</span>
+            <span>{label}</span>
+          </button>
+        ))}
+      </div>
+    )
+  );
+
+  const renderMobileCard = (notaire: Notaire) => (
+    <div
+      key={notaire.id}
+      onClick={() => onNotaireClick(notaire)}
+      className={`bg-white rounded-xl shadow-sm p-4 space-y-3 touch-card ${
+        selectedNotaire?.id === notaire.id ? 'ring-2 ring-teal-500' : ''
+      }`}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <h3 className="font-medium text-gray-900">{notaire.officeNotarial}</h3>
+          <p className="text-sm text-gray-500 mt-1">{notaire.ville}</p>
+        </div>
+        <div className="relative">
+          {renderStatusButton(notaire)}
+          {renderStatusMenu(notaire)}
+        </div>
+      </div>
+      
+      <div className="text-sm text-gray-600 space-y-2">
+        <p>{notaire.adresse}</p>
+        <p>{notaire.codePostal} {notaire.ville}</p>
+        {notaire.email && (
+          <p className="text-teal-600">{notaire.email}</p>
+        )}
+      </div>
+
+      <div className="flex items-center space-x-4 text-sm text-gray-500">
+        <div>
+          <span className="font-medium">{notaire.nbAssocies}</span> associé{notaire.nbAssocies > 1 ? 's' : ''}
+        </div>
+        <div>
+          <span className="font-medium">{notaire.nbSalaries}</span> salarié{notaire.nbSalaries > 1 ? 's' : ''}
+        </div>
+        {notaire.serviceNego && (
+          <div className="text-teal-600">
+            Service négo ✓
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-4">
       <SearchBar
@@ -65,7 +139,13 @@ const NotairesTable: React.FC<Props> = ({ notaires, onNotaireClick, selectedNota
         resultCount={filteredNotaires.length}
       />
 
-      <div className="overflow-x-auto">
+      {/* Vue mobile en cartes */}
+      <div className="md:hidden space-y-3">
+        {filteredNotaires.map(renderMobileCard)}
+      </div>
+
+      {/* Vue desktop en tableau */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -96,40 +176,15 @@ const NotairesTable: React.FC<Props> = ({ notaires, onNotaireClick, selectedNota
                 }`}
               >
                 <td className="px-6 py-4 whitespace-nowrap relative">
-                  <button
-                    onClick={(e) => handleStatutClick(e, notaire)}
-                    className="flex items-center space-x-2 hover:bg-gray-100 rounded-lg px-2 py-1 transition-colors duration-150"
-                  >
-                    <span className="text-xl" title={statusLabels[notaire.statut]}>
-                      {statusIcons[notaire.statut]}
-                    </span>
-                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                  {openStatusMenu === notaire.id && (
-                    <div className="absolute z-50 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200">
-                      {Object.entries(statusIcons).map(([statut, icon]) => (
-                        <button
-                          key={statut}
-                          onClick={(e) => handleStatutChange(e, notaire, statut as NotaireStatut)}
-                          className={`w-full flex items-center space-x-3 px-4 py-2 text-sm text-left hover:bg-gray-50 ${
-                            notaire.statut === statut ? 'bg-teal-50 text-teal-900' : 'text-gray-700'
-                          }`}
-                        >
-                          <span className="text-xl">{icon}</span>
-                          <span>{statusLabels[statut as NotaireStatut]}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  {renderStatusButton(notaire)}
+                  {renderStatusMenu(notaire)}
                 </td>
                 <td className="px-6 py-4">
                   <div className="text-sm font-medium text-gray-900">
                     {notaire.officeNotarial}
                   </div>
                   {notaire.email && (
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-teal-600">
                       {notaire.email}
                     </div>
                   )}
@@ -150,14 +205,12 @@ const NotairesTable: React.FC<Props> = ({ notaires, onNotaireClick, selectedNota
                     {notaire.nbSalaries} salarié{notaire.nbSalaries > 1 ? 's' : ''}
                   </div>
                 </td>
-                <td className="px-6 py-4">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    notaire.serviceNego
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {notaire.serviceNego ? 'Oui' : 'Non'}
-                  </span>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {notaire.serviceNego ? (
+                    <span className="text-teal-600">Oui ✓</span>
+                  ) : (
+                    <span>Non</span>
+                  )}
                 </td>
               </tr>
             ))}

@@ -10,6 +10,47 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* Safe areas pour les appareils mobiles */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Styles pour les éléments tactiles */
+.touch-button {
+  @apply min-h-[44px] min-w-[44px] select-none;
+  touch-action: manipulation;
+}
+
+.touch-checkbox {
+  @apply min-h-[24px] min-w-[24px] select-none;
+  touch-action: manipulation;
+}
+
+.touch-label {
+  @apply min-h-[44px] flex items-center select-none;
+}
+
+.touch-card {
+  @apply active:bg-gray-50 transition-colors duration-150 select-none;
+  touch-action: manipulation;
+}
+
+/* Amélioration du défilement sur mobile */
+@media (max-width: 768px) {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+}
+
 /* Animations */
 @keyframes slideIn {
   from {
@@ -109,8 +150,39 @@ body {
   @apply transition-transform duration-200;
 }
 
-.ville-marker:hover > div {
-  transform: translate(-50%, -50%) scale(1.1) !important;
+/* Styles pour les transitions */
+.fade-enter {
+  opacity: 0;
+}
+
+.fade-enter-active {
+  opacity: 1;
+  transition: opacity 200ms ease-in;
+}
+
+.fade-exit {
+  opacity: 1;
+}
+
+.fade-exit-active {
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+}
+
+/* Styles pour les animations de chargement */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite linear;
+  background: linear-gradient(to right, #f6f7f8 8%, #edeef1 18%, #f6f7f8 33%);
+  background-size: 2000px 100%;
 }
 
 /* Styles pour les boutons */

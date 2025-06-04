@@ -224,5 +224,24 @@ export const googleSheetsService = {
       console.error('Erreur lors de la sauvegarde:', error);
       throw error;
     }
+  },
+
+  async saveVillesInteret(villesInteret: VilleInteret[]): Promise<void> {
+    try {
+      const values = villesInteret.map(ville => [
+        ville.id,
+        ville.nom,
+        ville.rayon,
+        ville.latitude,
+        ville.longitude,
+        ville.departement,
+        ville.population
+      ]);
+      await writeSheetData('VillesInteret!A2:G', values);
+      console.log('Villes d\'intérêt sauvegardées avec succès');
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde des villes d\'intérêt:', error);
+      throw error;
+    }
   }
 };

@@ -13,6 +13,20 @@ interface StatCard {
   color: string;
 }
 
+const StatCard: React.FC<{
+  title: string;
+  value: number;
+  subtitle: string;
+  color: string;
+  textColor?: string;
+}> = ({ title, value, subtitle, color, textColor = 'text-gray-800' }) => (
+  <div className={`rounded-xl p-6 shadow-lg ${color} transition-transform duration-200 hover:scale-105`}>
+    <h3 className={`text-lg font-medium mb-2 ${textColor}`}>{title}</h3>
+    <p className={`text-4xl font-bold mb-1 ${textColor}`}>{value}</p>
+    <p className={`text-sm ${textColor} opacity-80`}>{subtitle}</p>
+  </div>
+);
+
 const Dashboard: React.FC<Props> = ({ notaires, onNotaireClick }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -22,25 +36,25 @@ const Dashboard: React.FC<Props> = ({ notaires, onNotaireClick }) => {
       title: 'Total Notaires',
       value: notaires.length,
       description: 'Nombre total d\'études',
-      color: 'teal'
+      color: 'bg-emerald-50'
     },
     {
       title: 'Favoris',
       value: notaires.filter(n => n.statut === 'favori').length,
       description: 'Études favorites',
-      color: 'yellow'
+      color: 'bg-amber-50'
     },
     {
       title: 'À envisager',
-      value: notaires.filter(n => n.statut === 'envisage').length,
+      value: notaires.filter(n => n.statut === 'a_envisager').length,
       description: 'Études à étudier',
-      color: 'blue'
+      color: 'bg-blue-50'
     },
     {
       title: 'Contactés',
-      value: notaires.filter(n => n.contacts?.length > 0).length,
+      value: notaires.filter(n => n.statut === 'contacte').length,
       description: 'Études déjà contactées',
-      color: 'purple'
+      color: 'bg-purple-50'
     }
   ];
 
@@ -102,19 +116,13 @@ const Dashboard: React.FC<Props> = ({ notaires, onNotaireClick }) => {
       {/* Cartes de statistiques */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => (
-          <div key={index} className={`bg-${stat.color}-50 p-6 rounded-xl shadow-sm`}>
-            <div className={`text-${stat.color}-600 text-sm font-medium`}>
-              {stat.title}
-            </div>
-            <div className={`mt-2 text-3xl font-bold text-${stat.color}-700`}>
-              {stat.value}
-            </div>
-            {stat.description && (
-              <div className={`mt-1 text-${stat.color}-600 text-sm`}>
-                {stat.description}
-              </div>
-            )}
-          </div>
+          <StatCard
+            key={index}
+            title={stat.title}
+            value={stat.value}
+            subtitle={stat.description}
+            color={stat.color}
+          />
         ))}
       </div>
 

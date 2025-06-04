@@ -475,15 +475,15 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 md:space-y-6">
       {/* Filtres principaux */}
-      <div className="space-y-4">
-        <div className="bg-white rounded-xl shadow-sm p-4 space-y-4">
+      <div className="space-y-3 md:space-y-4">
+        <div className="bg-white rounded-xl shadow-sm p-3 md:p-4 space-y-3 md:space-y-4">
           <h3 className="text-sm font-medium text-gray-900">Statut</h3>
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => toggleStatut('favori')}
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+              className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
                 filtres.statuts.includes('favori')
                   ? 'bg-teal-100 text-teal-800 ring-2 ring-teal-600'
                   : 'bg-white text-gray-700 border border-gray-200 hover:bg-teal-50'
@@ -493,7 +493,7 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
             </button>
             <button
               onClick={() => toggleStatut('envisage')}
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+              className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
                 filtres.statuts.includes('envisage')
                   ? 'bg-teal-100 text-teal-800 ring-2 ring-teal-600'
                   : 'bg-white text-gray-700 border border-gray-200 hover:bg-teal-50'
@@ -503,7 +503,7 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
             </button>
             <button
               onClick={() => toggleStatut('non_interesse')}
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+              className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
                 filtres.statuts.includes('non_interesse')
                   ? 'bg-gray-200 text-gray-800 ring-2 ring-gray-600'
                   : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-100'
@@ -513,7 +513,7 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
             </button>
             <button
               onClick={() => onFiltresChange({ ...filtres, statuts: [] })}
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+              className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
                 filtres.statuts.length === 0
                   ? 'bg-teal-100 text-teal-800 ring-2 ring-teal-600'
                   : 'bg-white text-gray-700 border border-gray-200 hover:bg-teal-50'
@@ -524,7 +524,7 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-4 space-y-4">
+        <div className="bg-white rounded-xl shadow-sm p-3 md:p-4 space-y-3 md:space-y-4">
           <CustomSelect
             label="Type d'étude"
             value={filtres.typeNotaire}
@@ -537,7 +537,7 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
           />
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-4 space-y-4">
+        <div className="bg-white rounded-xl shadow-sm p-3 md:p-4 space-y-3 md:space-y-4">
           <CustomSelect
             label="Service négociation"
             value={filtres.serviceNego}
@@ -547,26 +547,23 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
               { value: 'oui', label: 'Oui', icon: '✅' },
               { value: 'non', label: 'Non', icon: '❌' }
             ]}
-          >
-          </CustomSelect>
+          />
         </div>
       </div>
 
       {/* Filtres avancés */}
-      <div className="bg-white rounded-xl shadow-sm p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-gray-900">Filtres avancés</h3>
-          <button
-            onClick={() => setFiltresAvances(!filtresAvances)}
-            className="text-sm text-teal-600 hover:text-teal-800 font-medium"
-          >
-            {filtresAvances ? 'Masquer' : 'Afficher'}
-          </button>
-        </div>
+      <div className="bg-white rounded-xl shadow-sm p-3 md:p-4 space-y-3 md:space-y-4">
+        <button
+          onClick={() => setFiltresAvances(!filtresAvances)}
+          className="w-full flex items-center justify-between text-sm font-medium text-gray-900 touch-button"
+        >
+          <span>Filtres avancés</span>
+          <span className="text-teal-600">{filtresAvances ? 'Masquer' : 'Afficher'}</span>
+        </button>
 
         {filtresAvances && (
-          <div className="space-y-4 pt-4">
-            <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4 pt-2">
+            <div className="grid grid-cols-2 gap-3">
               <CustomNumberInput
                 label="Nombre d'associés"
                 value={filtres.minAssocies}
@@ -591,12 +588,12 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
       </div>
 
       {/* Villes d'intérêt */}
-      <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white rounded-xl shadow-sm p-3 md:p-4">
+        <div className="flex items-center justify-between mb-3 md:mb-4">
           <h3 className="text-sm font-medium text-gray-900">Villes d'intérêt</h3>
           <button
             onClick={() => setIsVillesModalOpen(true)}
-            className="px-3 py-1.5 text-sm font-medium text-teal-600 hover:text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors duration-200"
+            className="touch-button px-3 py-1.5 text-sm font-medium text-teal-600 hover:text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors duration-200"
           >
             Gérer les villes
           </button>
@@ -607,7 +604,7 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
           {filtres.villesInteret.map((ville) => (
             <div
               key={`resume-${ville.id}`}
-              className="inline-flex items-center px-3 py-1 bg-gray-100 text-sm text-gray-700 rounded-full"
+              className="inline-flex items-center px-3 py-1.5 bg-gray-100 text-sm text-gray-700 rounded-full"
             >
               <span className="mr-1">📍</span>
               {ville.nom}
@@ -617,14 +614,14 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
         </div>
 
         {/* Option pour filtrer uniquement dans les rayons */}
-        <div className="flex items-center space-x-2 mt-4 pt-4 border-t border-gray-200">
+        <div className="flex items-center space-x-3 mt-4 pt-4 border-t border-gray-200">
           <input
             type="checkbox"
             checked={filtres.showOnlyInRadius}
             onChange={(e) => handleShowOnlyInRadiusChange(e.target.checked)}
-            className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-gray-300 rounded"
+            className="h-5 w-5 text-teal-600 focus:ring-teal-500 border-gray-300 rounded touch-checkbox"
           />
-          <label className="text-sm text-gray-700">
+          <label className="text-sm text-gray-700 touch-label">
             Afficher uniquement les offices des villes sélectionnées
           </label>
         </div>
@@ -643,7 +640,7 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
           maxSalaries: 999,
           statuts: []
         })}
-        className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors duration-200"
+        className="w-full touch-button bg-gray-100 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-200 transition-colors duration-200 text-sm font-medium"
       >
         Réinitialiser les filtres
       </button>
