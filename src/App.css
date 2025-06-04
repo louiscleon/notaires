@@ -1,0 +1,168 @@
+/* Styles de base */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Styles spécifiques pour le touch */
+@media (hover: none) {
+  .touch-scroll {
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+  }
+  
+  .touch-button {
+    min-height: 44px; /* Taille minimale recommandée par Apple */
+    min-width: 44px;
+    touch-action: manipulation; /* Optimisation des performances tactiles */
+  }
+
+  /* Améliorer le tap highlight */
+  * {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+  }
+
+  /* Désactiver la sélection de texte sur les boutons */
+  button {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+}
+
+/* Styles spécifiques pour iPad */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .ipad-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    height: 100vh;
+    height: -webkit-fill-available; /* Fix pour Safari iOS */
+  }
+  
+  .ipad-sidebar {
+    height: 100vh;
+    height: -webkit-fill-available;
+    overflow-y: auto;
+  }
+  
+  .ipad-content {
+    height: 100vh;
+    height: -webkit-fill-available;
+    overflow-y: auto;
+  }
+}
+
+/* Styles spécifiques pour iPhone */
+@media (max-width: 767px) {
+  .mobile-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .mobile-safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Optimisations pour les petits écrans */
+  .mobile-text-adjust {
+    font-size: 16px; /* Empêcher le zoom automatique sur les inputs */
+    line-height: 1.3;
+  }
+
+  /* Améliorer la lisibilité des tableaux */
+  .mobile-table {
+    display: block;
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+    overflow-x: auto;
+  }
+
+  /* Optimiser les modales */
+  .mobile-modal {
+    margin: 0;
+    border-radius: 0;
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* Amélioration des interactions tactiles */
+.leaflet-control-zoom a,
+.leaflet-control-layers-toggle,
+.leaflet-popup-close-button {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  line-height: 44px !important;
+  font-size: 18px !important;
+  touch-action: manipulation !important;
+}
+
+/* Amélioration des popups sur mobile */
+@media (max-width: 767px) {
+  .leaflet-popup-content {
+    margin: 16px !important;
+    min-width: 260px !important;
+    font-size: 16px !important;
+  }
+  
+  .leaflet-popup-content-wrapper {
+    padding: 0 !important;
+    border-radius: 12px !important;
+  }
+
+  .leaflet-popup-tip-container {
+    height: 20px !important;
+  }
+}
+
+/* Amélioration du scroll sur iOS */
+.ios-momentum-scroll {
+  -webkit-overflow-scrolling: touch;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-behavior: smooth; /* Défilement fluide */
+}
+
+/* Désactiver le pull-to-refresh sur iOS */
+html, body {
+  overscroll-behavior-y: none;
+  height: 100vh;
+  height: -webkit-fill-available;
+}
+
+/* Améliorer la lisibilité sur les écrans Retina */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .retina-text {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+}
+
+/* Optimisations des performances */
+.optimize-performance {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  perspective: 1000;
+  -webkit-perspective: 1000;
+}
+
+/* Améliorer l'accessibilité tactile */
+@media (pointer: coarse) {
+  .touch-target {
+    padding: 8px;
+    margin: -8px;
+  }
+}
+
+/* Optimisations pour les appareils à faible batterie */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Fix pour le logo */
+.logo-fix {
+  transform: none !important;
+} 

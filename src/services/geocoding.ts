@@ -1,0 +1,182 @@
+import axios from 'axios';
+import { Notaire, GeocodingResult, GeocodingHistory } from '../types';
+
+export const GEOCODING_CACHE_KEY = 'geocoding_cache';
+
+interface GeocodingCache {
+  [key: string]: {
+    result: GeocodingResult;
+    timestamp: number;
+  };
+}
+
+export class GeocodingService {
+  private cache: GeocodingCache = {};
+  private readonly CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 jours
+
+  constructor() {
+    this.loadCache();
+  }
+
+  private loadCache() {
+    try {
+      const cached = localStorage.getItem(GEOCODING_CACHE_KEY);
+      if (cached) {
+        this.cache = JSON.parse(cached);
+        // Nettoyer les entrées expirées
+        const now = Date.now();
+        Object.keys(this.cache).forEach(key => {
+          if (now - this.cache[key].timestamp > this.CACHE_DURATION) {
+            delete this.cache[key];
+          }
+        });
+        this.saveCache();
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement du cache de géocodage:', error);
+      this.cache = {};
+    }
+  }
+
+  private saveCache() {
+    try {
+      localStorage.setItem(GEOCODING_CACHE_KEY, JSON.stringify(this.cache));
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde du cache de géocodage:', error);
+    }
+  }
+
+  private getCacheKey(address: string): string {
+    return address.toLowerCase().trim();
+  }
+
+  private isCacheValid(timestamp: number): boolean {
+    return Date.now() - timestamp <= this.CACHE_DURATION;
+  }
+
+  async geocodeAddress(address: string): Promise<GeocodingResult> {
+    const cacheKey = this.getCacheKey(address);
+    const cached = this.cache[cacheKey];
+
+    if (cached && this.isCacheValid(cached.timestamp)) {
+      console.log('Utilisation du cache pour:', address);
+      return cached.result;
+    }
+
+    try {
+      console.log('Géocodage de l\'adresse:', address);
+      const response = await axios.get(
+        `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(address)}`
+      );
+
+      if (response.data.features && response.data.features.length > 0) {
+        const feature = response.data.features[0];
+        const [lon, lat] = feature.geometry.coordinates;
+        const result: GeocodingResult = {
+          lat,
+          lon,
+          display_name: feature.properties.label,
+          score: feature.properties.score
+        };
+
+        // Mettre en cache
+        this.cache[cacheKey] = {
+          result,
+          timestamp: Date.now()
+        };
+        this.saveCache();
+
+        return result;
+      }
+
+      return {
+        lat: 0,
+        lon: 0,
+        display_name: '',
+        error: 'Adresse non trouvée',
+        score: 0
+      };
+    } catch (error) {
+      console.error('Erreur de géocodage:', error);
+      return {
+        lat: 0,
+        lon: 0,
+        display_name: '',
+        error: 'Erreur lors du géocodage',
+        score: 0
+      };
+    }
+  }
+
+  async geocodeNotaire(notaire: Notaire): Promise<GeocodingResult> {
+    const address = `${notaire.adresse}, ${notaire.codePostal} ${notaire.ville}`;
+    return this.geocodeAddress(address);
+  }
+
+  async geocodeSingleNotaire(notaire: Notaire): Promise<Notaire> {
+    const result = await this.geocodeNotaire(notaire);
+    const now = new Date().toISOString();
+
+    const history: GeocodingHistory = {
+      date: now,
+      address: `${notaire.adresse}, ${notaire.codePostal} ${notaire.ville}`,
+      success: !result.error,
+      coordinates: result.error ? undefined : { lat: result.lat, lon: result.lon }
+    };
+
+    return {
+      ...notaire,
+      latitude: result.lat,
+      longitude: result.lon,
+      display_name: result.display_name,
+      geoScore: result.score,
+      geoStatus: result.error ? 'error' : 'success',
+      geocodingHistory: [...(notaire.geocodingHistory || []), history]
+    };
+  }
+
+  clearCache() {
+    this.cache = {};
+    localStorage.removeItem(GEOCODING_CACHE_KEY);
+  }
+}
+
+export const geocodingService = new GeocodingService();
+
+export const geocodeAddress = async (address: string): Promise<GeocodingResult> => {
+  return geocodingService.geocodeAddress(address);
+};
+
+export const geocodeNotaire = async (notaire: Notaire): Promise<GeocodingResult> => {
+  return geocodingService.geocodeNotaire(notaire);
+};
+
+export const geocodeSingleNotaire = async (notaire: Notaire): Promise<Notaire> => {
+  return geocodingService.geocodeSingleNotaire(notaire);
+};
+
+export const geocodeBatch = async (
+  notaires: Notaire[],
+  onNotaireGeocoded?: (notaire: Notaire) => void
+): Promise<Notaire[]> => {
+  const results: Notaire[] = [];
+  
+  for (const notaire of notaires) {
+    try {
+      const updatedNotaire = await geocodingService.geocodeSingleNotaire(notaire);
+      results.push(updatedNotaire);
+      
+      if (onNotaireGeocoded) {
+        onNotaireGeocoded(updatedNotaire);
+      }
+      
+      // Petite pause entre chaque requête pour éviter de surcharger l'API
+      await new Promise(resolve => setTimeout(resolve, 100));
+    } catch (error) {
+      console.error(`Erreur lors du géocodage du notaire ${notaire.id}:`, error);
+      results.push(notaire);
+    }
+  }
+  
+  return results;
+};
