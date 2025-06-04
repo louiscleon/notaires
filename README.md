@@ -218,3 +218,11 @@ Pour toute question ou suggestion d'amélioration, n'hésitez pas à créer une 
 ---
 
 ### Développé avec ❤️ pour faciliter la gestion des relations avec les notaires de Bretagne**
+
+# Notaires App
+
+Application de gestion des notaires.
+
+## Déploiement
+
+Cette application est automatiquement déployée sur Vercel à chaque push sur la branche main.
