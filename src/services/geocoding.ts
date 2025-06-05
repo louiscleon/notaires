@@ -116,8 +116,12 @@ export class GeocodingService {
   }
 
   async geocodeNotaire(notaire: Notaire): Promise<GeocodingResult> {
-    const address = `${notaire.adresse}, ${notaire.codePostal} ${notaire.ville}`;
-    return this.geocodeAddress(address);
+    // Construire l'adresse à géocoder uniquement avec les parties non vides
+    const addressParts = [notaire.adresse, notaire.codePostal, notaire.ville]
+      .filter(part => part && String(part).trim().length > 0)
+      .join(' ')
+      .trim();
+    return this.geocodeAddress(addressParts);
   }
 
   async geocodeSingleNotaire(notaire: Notaire): Promise<Notaire> {
