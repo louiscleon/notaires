@@ -91,6 +91,12 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, l
 };
 
 const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEditing, setIsEditing }) => {
+  // Vérifier que le notaire a un ID valide
+  if (!notaire.id) {
+    console.error('Notaire sans ID reçu dans NotaireModal');
+    return null;
+  }
+
   const [editedNotaire, setEditedNotaire] = useState<Notaire>(notaire);
   const [activeTab, setActiveTab] = useState<'info' | 'contacts'>('info');
   const [geocodingStatus, setGeocodingStatus] = useState<string>('');
@@ -100,6 +106,12 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Vérifier que le notaire a un ID valide lors des mises à jour
+    if (!notaire.id) {
+      console.error('Notaire sans ID reçu dans la mise à jour de NotaireModal');
+      setSaveError('Erreur : ID du notaire manquant');
+      return;
+    }
     setEditedNotaire(notaire);
   }, [notaire]);
 
@@ -119,9 +131,18 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
 
   const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    
+    // S'assurer que l'ID est toujours présent
+    if (!editedNotaire.id) {
+      console.error('ID du notaire manquant');
+      setSaveError('Erreur : ID du notaire manquant');
+      return;
+    }
+
     const updatedNotaire = {
       ...editedNotaire,
-      [name]: value
+      [name]: value,
+      id: editedNotaire.id // Forcer l'ID à être conservé
     };
     setEditedNotaire(updatedNotaire);
 
@@ -141,10 +162,17 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   };
 
   const handleSelectAdresse = async (suggestion: AdresseSuggestion) => {
+    if (!editedNotaire.id) {
+      console.error('ID du notaire manquant');
+      setSaveError('Erreur : ID du notaire manquant');
+      return;
+    }
+
     setGeocodingStatus('Géocodage de la nouvelle adresse...');
     
     const updatedNotaire = {
       ...editedNotaire,
+      id: editedNotaire.id,
       adresse: suggestion.label,
       codePostal: suggestion.postcode,
       ville: suggestion.city,
@@ -171,8 +199,15 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   };
 
   const handleCheckboxChange = async (name: string, checked: boolean) => {
+    if (!editedNotaire.id) {
+      console.error('ID du notaire manquant');
+      setSaveError('Erreur : ID du notaire manquant');
+      return;
+    }
+
     const updatedNotaire = {
       ...editedNotaire,
+      id: editedNotaire.id,
       [name]: checked
     };
     setEditedNotaire(updatedNotaire);
@@ -180,8 +215,15 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   };
 
   const handleStatusChange = async (value: NotaireStatut) => {
+    if (!editedNotaire.id) {
+      console.error('ID du notaire manquant');
+      setSaveError('Erreur : ID du notaire manquant');
+      return;
+    }
+
     const updatedNotaire = {
       ...editedNotaire,
+      id: editedNotaire.id,
       statut: value
     };
     setEditedNotaire(updatedNotaire);
