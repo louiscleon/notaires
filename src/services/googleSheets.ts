@@ -83,8 +83,8 @@ function parseNotaire(row: any[]): Notaire {
     notes: notes || '',
     contacts: contacts ? JSON.parse(contacts) : [],
     dateModification: dateModification || new Date().toISOString(),
-    latitude: latitude ? parseFloat(latitude) : undefined,
-    longitude: longitude ? parseFloat(longitude) : undefined,
+    latitude: latitude !== undefined && latitude !== null && latitude !== '' && !isNaN(Number(latitude)) ? Number(latitude) : undefined,
+    longitude: longitude !== undefined && longitude !== null && longitude !== '' && !isNaN(Number(longitude)) ? Number(longitude) : undefined,
     geoScore: geoScore ? parseFloat(geoScore) : undefined,
     geocodingHistory: geocodingHistory ? JSON.parse(geocodingHistory) : []
   };

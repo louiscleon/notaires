@@ -140,14 +140,11 @@ const MapComponent: React.FC<Props> = ({
   // Style moderne pour les marqueurs selon le statut
   const createNotaireIcon = useCallback((statut: NotaireStatut, geoScore?: number) => {
     const config = iconConfigs[statut] || iconConfigs.non_defini;
-    const isLowScore = geoScore !== undefined && geoScore < 0.6;
-    
     return L.divIcon({
       className: 'notaire-marker',
       html: `
-        <div class="flex items-center justify-center w-8 h-8 ${config.bgColor} ${config.textColor} rounded-full border-2 ${isLowScore ? 'border-dashed border-red-500' : config.borderColor} shadow-lg transform -translate-x-1/2 -translate-y-1/2 hover:scale-110 transition-transform duration-200">
+        <div class="flex items-center justify-center w-8 h-8 ${config.bgColor} ${config.textColor} rounded-full border-2 ${config.borderColor} shadow-lg transform -translate-x-1/2 -translate-y-1/2 hover:scale-110 transition-transform duration-200">
           <span class="text-lg">${config.icon}</span>
-          ${isLowScore ? '<div class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></div>' : ''}
         </div>
       `,
       iconSize: [32, 32],
@@ -324,6 +321,13 @@ const MapComponent: React.FC<Props> = ({
 
     geocodeNotaires();
   }, [filteredNotaires, onNotaireUpdate, showOnlyInRadius, villesInteret, isNotaireInRadius]);
+
+  // Log temporaire pour debug
+  useEffect(() => {
+    notairesAvecCoordonnees.forEach(n => {
+      console.log(`[DEBUG] Notaire: ${n.officeNotarial}, lat: ${n.latitude}, lon: ${n.longitude}`);
+    });
+  }, [notairesAvecCoordonnees]);
 
   return (
     <div className="space-y-4">
