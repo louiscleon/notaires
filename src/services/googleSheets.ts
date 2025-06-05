@@ -1,3 +1,5 @@
+import { NotaireStatut, Contact, GeocodingHistory } from '../types';
+
 interface SheetData {
   notaires: any[];
   villesInteret: any[];
@@ -10,20 +12,24 @@ interface Notaire {
   codePostal: string;
   ville: string;
   departement: string;
-  email: string;
-  notairesAssocies: string;
-  notairesSalaries: string;
-  nbAssocies: number;
-  nbSalaries: number;
-  serviceNego: boolean;
-  statut: string;
-  notes: string;
-  contacts: any[];
-  dateModification: string;
+  telephone?: string;
+  email?: string;
+  siteWeb?: string;
   latitude?: number;
   longitude?: number;
+  statut: NotaireStatut;
+  contacts: Contact[];
+  dateModification?: string;
+  notes?: string;
+  nbAssocies: number;
+  nbSalaries: number;
+  notairesAssocies?: string;
+  notairesSalaries?: string;
+  serviceNego: boolean;
   geoScore?: number;
-  geocodingHistory?: any[];
+  geoStatus?: 'pending' | 'success' | 'error';
+  display_name?: string;
+  geocodingHistory?: GeocodingHistory[];
 }
 
 interface VilleInteret {
@@ -216,12 +222,48 @@ export const googleSheetsService = {
     }
   },
 
-  async saveToSheet(data: any[]): Promise<void> {
+  async saveToSheet(notaire: Notaire): Promise<void> {
     try {
-      await writeSheetData('Notaires!A2:T', data);
-      console.log('Données sauvegardées avec succès');
+      // Convertir le notaire en format de ligne pour Google Sheets
+      const row = [
+        notaire.id,
+        notaire.officeNotarial,
+        notaire.adresse,
+        notaire.codePostal,
+        notaire.ville,
+        notaire.departement,
+        notaire.email || '',
+        notaire.notairesAssocies || '',
+        notaire.notairesSalaries || '',
+        notaire.nbAssocies,
+        notaire.nbSalaries,
+        notaire.serviceNego ? 'oui' : 'non',
+        notaire.statut,
+        notaire.notes || '',
+        JSON.stringify(notaire.contacts || []),
+        notaire.dateModification || new Date().toISOString(),
+        notaire.latitude || '',
+        notaire.longitude || '',
+        notaire.geoScore || '',
+        JSON.stringify(notaire.geocodingHistory || [])
+      ];
+
+      // Trouver l'index de la ligne correspondante dans la feuille
+      const allData = await this.loadFromSheet();
+      const notaireIndex = allData.notaires.findIndex(n => n.id === notaire.id);
+      
+      if (notaireIndex === -1) {
+        throw new Error(`Notaire avec l'ID ${notaire.id} non trouvé dans la feuille`);
+      }
+
+      // Calculer la ligne réelle dans la feuille (ajouter 2 car la première ligne est l'en-tête)
+      const rowIndex = notaireIndex + 2;
+      
+      // Mettre à jour la ligne spécifique
+      await writeSheetData(`Notaires!A${rowIndex}:T${rowIndex}`, [row]);
+      console.log('Notaire sauvegardé avec succès dans Google Sheets');
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde:', error);
+      console.error('Erreur lors de la sauvegarde dans Google Sheets:', error);
       throw error;
     }
   },

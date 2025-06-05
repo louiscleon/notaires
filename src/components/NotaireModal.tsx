@@ -97,6 +97,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   const [adresseSuggestions, setAdresseSuggestions] = useState<AdresseSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     setEditedNotaire(notaire);
@@ -189,10 +190,12 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
 
   const saveAndSync = async (updatedNotaire: Notaire) => {
     try {
+      setSaveError(null);
       onSave(updatedNotaire);
-      await googleSheetsService.saveToSheet([updatedNotaire]);
+      await googleSheetsService.saveToSheet(updatedNotaire);
     } catch (error) {
       console.error('Erreur lors de la synchronisation avec Google Sheets:', error);
+      setSaveError('Erreur lors de la sauvegarde. Les modifications seront perdues au rechargement de la page.');
     }
   };
 
@@ -447,6 +450,15 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                       notaire={notaire}
                       onUpdate={onSave}
                     />
+                  )}
+
+                  {saveError && (
+                    <div className="mt-6 p-4 rounded-lg bg-red-50 text-red-700 border border-red-200">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xl">⚠️</span>
+                        <span>{saveError}</span>
+                      </div>
+                    </div>
                   )}
 
                   {geocodingStatus && (
