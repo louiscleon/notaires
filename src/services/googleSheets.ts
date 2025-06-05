@@ -222,46 +222,74 @@ export const googleSheetsService = {
     }
   },
 
-  async saveToSheet(notaire: Notaire): Promise<void> {
+  async saveToSheet(notaire: Notaire | Notaire[]): Promise<void> {
     try {
-      // Convertir le notaire en format de ligne pour Google Sheets
-      const row = [
-        notaire.id,
-        notaire.officeNotarial,
-        notaire.adresse,
-        notaire.codePostal,
-        notaire.ville,
-        notaire.departement,
-        notaire.email || '',
-        notaire.notairesAssocies || '',
-        notaire.notairesSalaries || '',
-        notaire.nbAssocies,
-        notaire.nbSalaries,
-        notaire.serviceNego ? 'oui' : 'non',
-        notaire.statut,
-        notaire.notes || '',
-        JSON.stringify(notaire.contacts || []),
-        notaire.dateModification || new Date().toISOString(),
-        notaire.latitude || '',
-        notaire.longitude || '',
-        notaire.geoScore || '',
-        JSON.stringify(notaire.geocodingHistory || [])
-      ];
+      if (Array.isArray(notaire)) {
+        // Si c'est un tableau de notaires, sauvegarder tout
+        const values = notaire.map(n => [
+          n.id,
+          n.officeNotarial,
+          n.adresse,
+          n.codePostal,
+          n.ville,
+          n.departement,
+          n.email || '',
+          n.notairesAssocies || '',
+          n.notairesSalaries || '',
+          n.nbAssocies,
+          n.nbSalaries,
+          n.serviceNego ? 'oui' : 'non',
+          n.statut,
+          n.notes || '',
+          JSON.stringify(n.contacts || []),
+          n.dateModification || new Date().toISOString(),
+          n.latitude || '',
+          n.longitude || '',
+          n.geoScore || '',
+          JSON.stringify(n.geocodingHistory || [])
+        ]);
+        await writeSheetData('Notaires!A2:T', values);
+        console.log('Tous les notaires sauvegardés avec succès dans Google Sheets');
+      } else {
+        // Si c'est un seul notaire, trouver sa ligne et la mettre à jour
+        const row = [
+          notaire.id,
+          notaire.officeNotarial,
+          notaire.adresse,
+          notaire.codePostal,
+          notaire.ville,
+          notaire.departement,
+          notaire.email || '',
+          notaire.notairesAssocies || '',
+          notaire.notairesSalaries || '',
+          notaire.nbAssocies,
+          notaire.nbSalaries,
+          notaire.serviceNego ? 'oui' : 'non',
+          notaire.statut,
+          notaire.notes || '',
+          JSON.stringify(notaire.contacts || []),
+          notaire.dateModification || new Date().toISOString(),
+          notaire.latitude || '',
+          notaire.longitude || '',
+          notaire.geoScore || '',
+          JSON.stringify(notaire.geocodingHistory || [])
+        ];
 
-      // Trouver l'index de la ligne correspondante dans la feuille
-      const allData = await this.loadFromSheet();
-      const notaireIndex = allData.notaires.findIndex(n => n.id === notaire.id);
-      
-      if (notaireIndex === -1) {
-        throw new Error(`Notaire avec l'ID ${notaire.id} non trouvé dans la feuille`);
+        // Trouver l'index de la ligne correspondante dans la feuille
+        const allData = await this.loadFromSheet();
+        const notaireIndex = allData.notaires.findIndex(n => n.id === notaire.id);
+        
+        if (notaireIndex === -1) {
+          throw new Error(`Notaire avec l'ID ${notaire.id} non trouvé dans la feuille`);
+        }
+
+        // Calculer la ligne réelle dans la feuille (ajouter 2 car la première ligne est l'en-tête)
+        const rowIndex = notaireIndex + 2;
+        
+        // Mettre à jour la ligne spécifique
+        await writeSheetData(`Notaires!A${rowIndex}:T${rowIndex}`, [row]);
+        console.log('Notaire sauvegardé avec succès dans Google Sheets');
       }
-
-      // Calculer la ligne réelle dans la feuille (ajouter 2 car la première ligne est l'en-tête)
-      const rowIndex = notaireIndex + 2;
-      
-      // Mettre à jour la ligne spécifique
-      await writeSheetData(`Notaires!A${rowIndex}:T${rowIndex}`, [row]);
-      console.log('Notaire sauvegardé avec succès dans Google Sheets');
     } catch (error) {
       console.error('Erreur lors de la sauvegarde dans Google Sheets:', error);
       throw error;

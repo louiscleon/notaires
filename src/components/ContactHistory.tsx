@@ -97,23 +97,11 @@ const ContactHistory: React.FC<Props> = ({ notaire, onUpdate }) => {
 
   const saveAndSync = async (updatedNotaire: Notaire) => {
     try {
-      // Vérifier la configuration Google Sheets
-      if (!googleSheetsService.checkConfiguration()) {
-        console.error('Configuration Google Sheets manquante');
-        // On continue quand même avec la mise à jour locale
-        setLocalContacts(updatedNotaire.contacts || []);
-        onUpdate(updatedNotaire);
-        return;
-      }
-
       // Mettre à jour l'état local immédiatement
       setLocalContacts(updatedNotaire.contacts || []);
       
       // Mettre à jour l'état parent
       onUpdate(updatedNotaire);
-
-      // S'assurer que l'authentification est valide
-      await googleSheetsService.ensureAuth();
 
       // Synchroniser avec Google Sheets
       console.log('Tentative de synchronisation avec Google Sheets...', {
@@ -122,23 +110,10 @@ const ContactHistory: React.FC<Props> = ({ notaire, onUpdate }) => {
         contacts: updatedNotaire.contacts
       });
 
-      // Charger les données existantes
-      const response = await googleSheetsService.loadFromSheet();
-      const existingNotaires = response.notaires;
-      
-      // Mettre à jour le notaire dans les données existantes
-      const updatedNotaires = existingNotaires.map(n => 
-        n.id === updatedNotaire.id ? updatedNotaire : n
-      );
-
-      // Sauvegarder toutes les données
-      await googleSheetsService.saveToSheet(updatedNotaires);
+      await googleSheetsService.saveToSheet(updatedNotaire);
       console.log('Synchronisation avec Google Sheets réussie');
     } catch (error) {
       console.error('Erreur lors de la synchronisation avec Google Sheets:', error);
-      // En cas d'erreur, on garde quand même la mise à jour locale
-      // et on affiche un message à l'utilisateur
-      alert('La mise à jour a été sauvegardée localement mais la synchronisation avec Google Sheets a échoué. Veuillez réessayer plus tard.');
     }
   };
 
