@@ -66,17 +66,24 @@ export class GeocodingService {
     try {
       console.log('Géocodage de l\'adresse:', address);
       const response = await axios.get(
-        `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(address)}`
+        `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(address)}&limit=1&type=housenumber&autocomplete=0`
       );
 
       if (response.data.features && response.data.features.length > 0) {
         const feature = response.data.features[0];
         const [lon, lat] = feature.geometry.coordinates;
+        const score = feature.properties.score;
+
+        // Vérifier si le score est suffisant (0.6 est un bon seuil pour les adresses précises)
+        if (score < 0.6) {
+          console.warn(`Score de géocodage faible (${score}) pour l'adresse: ${address}`);
+        }
+
         const result: GeocodingResult = {
           lat,
           lon,
           display_name: feature.properties.label,
-          score: feature.properties.score
+          score: score
         };
 
         // Mettre en cache

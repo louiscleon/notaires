@@ -138,13 +138,16 @@ const MapComponent: React.FC<Props> = ({
   }), []);
 
   // Style moderne pour les marqueurs selon le statut
-  const createNotaireIcon = useCallback((statut: NotaireStatut) => {
+  const createNotaireIcon = useCallback((statut: NotaireStatut, geoScore?: number) => {
     const config = iconConfigs[statut] || iconConfigs.non_defini;
+    const isLowScore = geoScore !== undefined && geoScore < 0.6;
+    
     return L.divIcon({
       className: 'notaire-marker',
       html: `
-        <div class="flex items-center justify-center w-8 h-8 ${config.bgColor} ${config.textColor} rounded-full border-2 ${config.borderColor} shadow-lg transform -translate-x-1/2 -translate-y-1/2 hover:scale-110 transition-transform duration-200">
+        <div class="flex items-center justify-center w-8 h-8 ${config.bgColor} ${config.textColor} rounded-full border-2 ${isLowScore ? 'border-dashed border-red-500' : config.borderColor} shadow-lg transform -translate-x-1/2 -translate-y-1/2 hover:scale-110 transition-transform duration-200">
           <span class="text-lg">${config.icon}</span>
+          ${isLowScore ? '<div class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></div>' : ''}
         </div>
       `,
       iconSize: [32, 32],
@@ -232,8 +235,13 @@ const MapComponent: React.FC<Props> = ({
     const notairesMap = new Map(filteredNotaires.map(n => [n.id, n]));
     notairesRef.current = notairesMap;
 
-    // Filtrer les notaires qui ont déjà des coordonnées
-    let notairesValides = filteredNotaires.filter(n => n.latitude && n.longitude);
+    // Filtrer les notaires qui ont déjà des coordonnées valides
+    let notairesValides = filteredNotaires.filter(n =>
+      typeof n.latitude === 'number' &&
+      typeof n.longitude === 'number' &&
+      !isNaN(n.latitude) &&
+      !isNaN(n.longitude)
+    );
     
     // Si showOnlyInRadius est activé, filtrer les notaires dans les rayons
     if (showOnlyInRadius) {
@@ -380,41 +388,23 @@ const MapComponent: React.FC<Props> = ({
 
           {notairesAvecCoordonnees.map((notaire) => (
             <Marker
-              key={`marker-${notaire.id}`}
-              position={[notaire.latitude!, notaire.longitude!]}
-              icon={createNotaireIcon(notaire.statut)}
-              eventHandlers={markerEventHandlers(notaire)}
+              key={notaire.id}
+              position={[notaire.latitude as number, notaire.longitude as number]}
+              icon={createNotaireIcon(notaire.statut, notaire.geoScore)}
+              eventHandlers={{
+                click: () => onNotaireClick && onNotaireClick(notaire)
+              }}
             >
-              <Popup className="custom-popup">
-                <div className="p-4 max-w-xs">
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">
-                    {notaire.officeNotarial}
-                  </h3>
-                  <div className="space-y-2">
-                    <p className="text-gray-600">{notaire.adresse}</p>
-                    <p className="text-gray-600">{notaire.codePostal} {notaire.ville}</p>
-                    <div className="grid grid-cols-2 gap-2 mt-3">
-                      <div className="bg-teal-50 p-2 rounded-lg">
-                        <div className="text-xs text-teal-600 font-medium">Associés</div>
-                        <div className="text-lg font-bold text-teal-700">{notaire.nbAssocies}</div>
-                      </div>
-                      <div className="bg-blue-50 p-2 rounded-lg">
-                        <div className="text-xs text-blue-600 font-medium">Salariés</div>
-                        <div className="text-lg font-bold text-blue-700">{notaire.nbSalaries}</div>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex justify-center">
-                      <span
-                        className={`px-3 py-1 text-sm font-medium rounded-full ${
-                          notaire.serviceNego
-                            ? 'bg-teal-100 text-teal-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {notaire.serviceNego ? 'Service négociation' : 'Sans service négo'}
-                      </span>
-                    </div>
-                  </div>
+              <Popup>
+                <div className="p-2">
+                  <h3 className="font-bold text-lg">{notaire.officeNotarial}</h3>
+                  <p className="text-sm text-gray-600">{notaire.adresse}</p>
+                  <p className="text-sm text-gray-600">{notaire.codePostal} {notaire.ville}</p>
+                  {notaire.geoScore !== undefined && notaire.geoScore < 0.6 && (
+                    <p className="text-xs text-red-500 mt-1">
+                      ⚠️ Position approximative (score: {notaire.geoScore.toFixed(2)})
+                    </p>
+                  )}
                 </div>
               </Popup>
             </Marker>
