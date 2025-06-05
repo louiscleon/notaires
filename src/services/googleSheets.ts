@@ -66,7 +66,7 @@ function parseNotaire(row: any[]): Notaire {
     geocodingHistory
   ] = row;
 
-  return {
+  const notaire = {
     id: id || `notaire_${Date.now()}`,
     officeNotarial: officeNotarial || '',
     adresse: adresse || '',
@@ -88,6 +88,9 @@ function parseNotaire(row: any[]): Notaire {
     geoScore: geoScore ? parseFloat(geoScore) : undefined,
     geocodingHistory: geocodingHistory ? JSON.parse(geocodingHistory) : []
   };
+  // Log détaillé pour debug
+  console.log(`[DEBUG][parseNotaire] id: ${notaire.id}, office: ${notaire.officeNotarial}, lat: ${notaire.latitude}, lon: ${notaire.longitude}`);
+  return notaire;
 }
 
 function parseVilleInteret(row: any[]): VilleInteret {
