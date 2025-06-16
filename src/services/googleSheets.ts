@@ -9,7 +9,7 @@ interface SheetData {
 // Définition des plages de cellules pour Google Sheets
 const SHEET_RANGES = {
   NOTAIRES: 'Notaires!A2:Z',
-  VILLES_INTERET: 'Villes d\'intérêt!A2:D'
+  VILLES_INTERET: 'VillesInteret!A2:G'
 } as const;
 
 async function fetchWithCors(url: string, options?: RequestInit): Promise<Response> {
