@@ -15,8 +15,8 @@ const SHEET_RANGES = {
 // Configuration du rate limiting
 const RATE_LIMIT = {
   MAX_REQUESTS_PER_MINUTE: 50,
-  BATCH_SIZE: 10,
-  DELAY_BETWEEN_REQUESTS: 2000, // 2 secondes entre chaque requête
+  BATCH_SIZE: 20,
+  DELAY_BETWEEN_REQUESTS: 500, // 500ms entre chaque requête
 };
 
 // File d'attente pour les requêtes
@@ -72,7 +72,6 @@ async function queueRequest<T>(request: () => Promise<T>): Promise<T> {
 
 async function fetchWithCors(url: string, options?: RequestInit): Promise<Response> {
   const request = async () => {
-    console.log('Sending request to:', url, 'with options:', options);
     try {
       const response = await fetch(url, {
         ...options,
@@ -85,16 +84,8 @@ async function fetchWithCors(url: string, options?: RequestInit): Promise<Respon
         },
       });
 
-      console.log('Response status:', response.status);
-      
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Response error:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorText
-        });
-        
         if (errorText.trim().startsWith('<!DOCTYPE html>')) {
           throw new Error('Received HTML response instead of JSON. The API endpoint might be incorrect or the server might be down.');
         }
@@ -104,7 +95,6 @@ async function fetchWithCors(url: string, options?: RequestInit): Promise<Respon
 
       return response;
     } catch (error) {
-      console.error('Fetch error:', error);
       if (error instanceof TypeError && error.message.includes('CORS')) {
         throw new Error('Erreur de connexion à l\'API. Veuillez vérifier que l\'API est bien déployée et accessible.');
       }
@@ -116,72 +106,43 @@ async function fetchWithCors(url: string, options?: RequestInit): Promise<Respon
 }
 
 async function parseJsonResponse(response: Response): Promise<any> {
+  const text = await response.text();
   try {
-    const text = await response.text();
-    console.log('Response text:', text);
-    
-    try {
-      const json = JSON.parse(text);
-      console.log('Parsed JSON:', json);
-      return json;
-    } catch (error) {
-      console.error('JSON parse error:', error);
-      throw new Error(`Invalid JSON response: ${text}`);
-    }
+    return JSON.parse(text);
   } catch (error) {
-    console.error('Response text error:', error);
-    throw error;
+    throw new Error(`Invalid JSON response: ${text}`);
   }
 }
 
 export const googleSheetsService = {
   async loadFromSheet(): Promise<SheetData> {
-    console.log('Loading data from sheet...');
     try {
       // Charger les notaires
-      console.log('Fetching notaires...');
       const responseNotaires = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.NOTAIRES}`);
-      console.log('Notaires response received');
       const dataNotaires = await parseJsonResponse(responseNotaires);
-      console.log('Notaires data parsed:', { count: dataNotaires?.length });
-      
       if (!Array.isArray(dataNotaires)) {
-        console.error('Invalid notaires data:', dataNotaires);
         throw new Error('Invalid API response format for notaires');
       }
       const notaires = dataNotaires.map(row => parseNotaire(row));
-      console.log('Notaires parsed:', { count: notaires.length });
 
       // Charger les villes d'intérêt
-      console.log('Fetching villes...');
       const responseVilles = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.VILLES_INTERET}`);
-      console.log('Villes response received');
       const dataVilles = await parseJsonResponse(responseVilles);
-      console.log('Villes data parsed:', { count: dataVilles?.length });
-      
       if (!Array.isArray(dataVilles)) {
-        console.error('Invalid villes data:', dataVilles);
         throw new Error('Invalid API response format for villes d\'intérêt');
       }
       const villesInteret = dataVilles.map(row => parseVilleInteret(row));
-      console.log('Villes parsed:', { count: villesInteret.length });
 
       return { notaires, villesInteret };
     } catch (error) {
-      console.error('Load error:', {
-        error,
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
-      });
+      console.error('Load error:', error);
       throw error;
     }
   },
 
   async saveToSheet(notaire: Notaire | Notaire[]): Promise<void> {
-    console.log('Saving to sheet...');
     try {
       const notaires = Array.isArray(notaire) ? notaire : [notaire];
-      console.log('Saving notaires:', { count: notaires.length });
 
       // Valider les données avant l'envoi
       notaires.forEach(n => {
@@ -194,11 +155,9 @@ export const googleSheetsService = {
       for (let i = 0; i < notaires.length; i += RATE_LIMIT.BATCH_SIZE) {
         batches.push(notaires.slice(i, i + RATE_LIMIT.BATCH_SIZE));
       }
-      console.log('Created batches:', { count: batches.length });
 
       // Traiter chaque lot séquentiellement
       for (const batch of batches) {
-        console.log('Processing batch:', { size: batch.length });
         const values = batch.map(notaire => {
           const row = [
             notaire.id || '',
@@ -230,7 +189,6 @@ export const googleSheetsService = {
           return row;
         });
 
-        console.log('Sending batch to API...');
         const response = await fetchWithCors(`${API_BASE_URL}/sheets`, {
           method: 'POST',
           body: JSON.stringify({ 
@@ -238,10 +196,8 @@ export const googleSheetsService = {
             values
           }),
         });
-        console.log('Batch response received');
 
         const data = await parseJsonResponse(response);
-        console.log('Batch response parsed:', data);
         
         if (!data || typeof data !== 'object') {
           throw new Error('Réponse invalide du serveur');
@@ -251,13 +207,8 @@ export const googleSheetsService = {
           throw new Error(`Erreur lors de la sauvegarde: ${data.error}`);
         }
       }
-      console.log('All batches processed successfully');
     } catch (error) {
-      console.error('Save error:', {
-        error,
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
-      });
+      console.error('Save error:', error);
       throw error;
     }
   },
@@ -290,7 +241,7 @@ export const googleSheetsService = {
 
       return data;
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde des villes:', error);
+      console.error('Save error:', error);
       throw error;
     }
   },
@@ -301,7 +252,7 @@ export const googleSheetsService = {
       const data = await parseJsonResponse(response);
       return data;
     } catch (error) {
-      console.error('Erreur lors du test de configuration:', error);
+      console.error('Config test error:', error);
       throw error;
     }
   }

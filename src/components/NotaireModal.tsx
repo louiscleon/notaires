@@ -250,16 +250,20 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   };
 
   const handleClose = async () => {
-    // Sauvegarder les modifications non enregistrées avant de fermer
+    // Si des modifications sont en cours, les sauvegarder
     if (hasUnsavedChanges.current) {
       try {
         await saveAndSync(editedNotaire);
       } catch (error) {
         console.error('Erreur lors de la sauvegarde finale:', error);
-        setSaveError('Erreur lors de la sauvegarde. Veuillez réessayer avant de fermer.');
+        setSaveError('Erreur lors de la sauvegarde. Voulez-vous réessayer ?');
         return; // Ne pas fermer si la sauvegarde a échoué
       }
     }
+    
+    // Réinitialiser l'état
+    hasUnsavedChanges.current = false;
+    setSaveError(null);
     onClose();
   };
 
