@@ -16,15 +16,30 @@
   "routes": [
     {
       "src": "/api/test",
-      "dest": "/api/src/test.ts"
+      "dest": "/api/src/test.ts",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "X-Requested-With, Content-Type, Accept"
+      }
     },
     {
       "src": "/api/sheets",
-      "dest": "/api/src/sheets.ts"
+      "dest": "/api/src/sheets.ts",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "X-Requested-With, Content-Type, Accept"
+      }
     },
     {
       "src": "/api/geocoding",
-      "dest": "/api/src/geocoding.ts"
+      "dest": "/api/src/geocoding.ts",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "X-Requested-With, Content-Type, Accept"
+      }
     },
     {
       "handle": "filesystem"

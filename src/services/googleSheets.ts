@@ -145,7 +145,7 @@ export const googleSheetsService = {
   async testConfig(): Promise<any> {
     try {
       console.log('Testing API configuration...');
-      const response = await fetchWithCors(`${API_BASE_URL}/sheets/test?range=${SHEET_RANGES.NOTAIRES}`);
+      const response = await fetchWithCors(`${API_BASE_URL}/test`);
       const data = await parseJsonResponse(response);
       console.log('Test response:', data);
       return data;
