@@ -173,9 +173,20 @@ const App: React.FC = () => {
     checkConfig();
   }, []);
 
-  const handleStatutChange = (notaire: Notaire, newStatut: NotaireStatut) => {
+  const handleStatutChange = async (notaire: Notaire, newStatut: NotaireStatut) => {
     const updatedNotaire = { ...notaire, statut: newStatut, dateModification: new Date().toISOString() };
     setNotaires(notaires.map(n => n.id === notaire.id ? updatedNotaire : n));
+    try {
+      await googleSheetsService.saveToSheet(updatedNotaire);
+    } catch (error) {
+      console.error('Erreur de synchronisation:', error);
+      addToast(
+        error instanceof Error 
+          ? `Erreur de synchronisation : ${error.message}`
+          : 'Erreur de synchronisation inconnue',
+        'error'
+      );
+    }
   };
 
   const notairesFiltres = useMemo(() => {
@@ -276,10 +287,20 @@ const App: React.FC = () => {
     setSelectedNotaire(null);
   };
 
-  const handleNotaireUpdate = (updatedNotaire: Notaire) => {
+  const handleNotaireUpdate = async (updatedNotaire: Notaire) => {
     const newNotaires = notaires.map(n => n.id === updatedNotaire.id ? updatedNotaire : n);
     setNotaires(newNotaires);
-    // La synchronisation sera faite automatiquement par le composant qui a fait la mise à jour
+    try {
+      await googleSheetsService.saveToSheet(updatedNotaire);
+    } catch (error) {
+      console.error('Erreur de synchronisation:', error);
+      addToast(
+        error instanceof Error 
+          ? `Erreur de synchronisation : ${error.message}`
+          : 'Erreur de synchronisation inconnue',
+        'error'
+      );
+    }
   };
 
   const handleFiltresChange = (newFiltres: Filtres) => {

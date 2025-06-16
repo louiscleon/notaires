@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Notaire, NotaireStatut, Contact, ContactStatut, AdresseSuggestion } from '../types';
 import { searchAdresse } from '../services/adresse';
 import { geocodeAddress } from '../services/geocoding';
+import { googleSheetsService } from '../services/googleSheets';
 
 interface NotaireDetailProps {
   notaire: Notaire;
@@ -98,22 +99,35 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
           latitude: result.lat,
           longitude: result.lon,
           display_name: result.display_name,
+          dateModification: new Date().toISOString()
         };
         
         onUpdate(updatedNotaire);
+        await googleSheetsService.saveToSheet(updatedNotaire);
         setGeocodingStatus('Géocodage réussi !');
         setIsEditing(false);
       } catch (error) {
-        setGeocodingStatus('Erreur lors du géocodage');
+        console.error('Erreur lors du géocodage ou de la sauvegarde:', error);
+        setGeocodingStatus('Erreur lors du géocodage ou de la sauvegarde');
         return;
       }
     } else {
-      onUpdate(editedNotaire);
-      setIsEditing(false);
+      const updatedNotaire = {
+        ...editedNotaire,
+        dateModification: new Date().toISOString()
+      };
+      onUpdate(updatedNotaire);
+      try {
+        await googleSheetsService.saveToSheet(updatedNotaire);
+        setIsEditing(false);
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde:', error);
+        setGeocodingStatus('Erreur lors de la sauvegarde');
+      }
     }
   };
 
-  const handleSelectAdresse = (suggestion: AdresseSuggestion) => {
+  const handleSelectAdresse = async (suggestion: AdresseSuggestion) => {
     setAdresse(suggestion.label);
     const updatedNotaire: Notaire = {
       ...notaire,
@@ -125,10 +139,16 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
       dateModification: new Date().toISOString()
     };
     onUpdate(updatedNotaire);
+    try {
+      await googleSheetsService.saveToSheet(updatedNotaire);
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation avec Google Sheets:', error);
+      setGeocodingStatus('Erreur lors de la sauvegarde dans Google Sheets');
+    }
     setAdresseSuggestions([]);
   };
 
-  const handleAddContact = () => {
+  const handleAddContact = async () => {
     if (!newContact.date) return;
 
     const contact: Contact = {
@@ -143,7 +163,15 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
       contacts: [...notaire.contacts, contact],
       dateModification: new Date().toISOString()
     };
-    onUpdate(updatedNotaire);
+    
+    try {
+      onUpdate(updatedNotaire);
+      await googleSheetsService.saveToSheet(updatedNotaire);
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation avec Google Sheets:', error);
+      setGeocodingStatus('Erreur lors de la sauvegarde dans Google Sheets');
+    }
+
     setShowContactForm(false);
     setNewContact({
       type: 'initial',
@@ -152,7 +180,7 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
     });
   };
 
-  const handleUpdateContact = (index: number, updates: Partial<Contact>) => {
+  const handleUpdateContact = async (index: number, updates: Partial<Contact>) => {
     const updatedContacts = [...notaire.contacts];
     const currentContact = updatedContacts[index];
     
@@ -173,11 +201,19 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
 
     updatedContacts[index] = { ...currentContact, ...updates };
 
-    onUpdate({
+    const updatedNotaire = {
       ...notaire,
       contacts: updatedContacts,
       dateModification: new Date().toISOString()
-    });
+    };
+
+    try {
+      onUpdate(updatedNotaire);
+      await googleSheetsService.saveToSheet(updatedNotaire);
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation avec Google Sheets:', error);
+      setGeocodingStatus('Erreur lors de la sauvegarde dans Google Sheets');
+    }
   };
 
   if (!isOpen) return null;
