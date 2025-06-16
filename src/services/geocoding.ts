@@ -91,12 +91,11 @@ export class GeocodingService {
       console.log('Géocodage de l\'adresse:', address);
       const response = await this.retryWithDelay(() => 
         axios.get(
-          `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(address)}&limit=1&type=housenumber&autocomplete=0`,
+          `/api/geocoding?address=${encodeURIComponent(address)}`,
           { 
             timeout: this.REQUEST_TIMEOUT,
             headers: {
-              'Accept': 'application/json',
-              'User-Agent': 'NotairesApp/1.0'
+              'Accept': 'application/json'
             }
           }
         )
@@ -104,49 +103,32 @@ export class GeocodingService {
 
       console.log('Réponse de l\'API de géocodage:', response.data);
 
-      if (response.data.features && response.data.features.length > 0) {
-        const feature = response.data.features[0];
-        const [lon, lat] = feature.geometry.coordinates;
-        const score = feature.properties.score;
-
-        console.log('Résultat du géocodage:', {
-          address,
-          lat,
-          lon,
-          score,
-          label: feature.properties.label
-        });
-
-        // Vérifier si le score est suffisant (0.6 est un bon seuil pour les adresses précises)
-        if (score < 0.6) {
-          console.warn(`Score de géocodage faible (${score}) pour l'adresse: ${address}`);
-        }
-
-        const result: GeocodingResult = {
-          lat,
-          lon,
-          display_name: feature.properties.label,
-          score: score
+      if (response.data.error) {
+        console.warn('Erreur de géocodage:', response.data.error);
+        return {
+          lat: 0,
+          lon: 0,
+          display_name: '',
+          error: response.data.error,
+          score: 0
         };
-
-        // Mettre en cache
-        this.cache[cacheKey] = {
-          result,
-          timestamp: Date.now()
-        };
-        this.saveCache();
-
-        return result;
       }
 
-      console.warn('Aucun résultat trouvé pour l\'adresse:', address);
-      return {
-        lat: 0,
-        lon: 0,
-        display_name: '',
-        error: 'Adresse non trouvée',
-        score: 0
+      const result: GeocodingResult = {
+        lat: response.data.lat,
+        lon: response.data.lon,
+        display_name: response.data.display_name,
+        score: response.data.score
       };
+
+      // Mettre en cache
+      this.cache[cacheKey] = {
+        result,
+        timestamp: Date.now()
+      };
+      this.saveCache();
+
+      return result;
     } catch (error) {
       console.error('Erreur de géocodage:', error);
       return {

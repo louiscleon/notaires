@@ -23,6 +23,10 @@
       "dest": "/api/src/sheets.ts"
     },
     {
+      "src": "/api/geocoding",
+      "dest": "/api/src/geocoding.ts"
+    },
+    {
       "handle": "filesystem"
     },
     {
