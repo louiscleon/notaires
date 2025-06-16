@@ -1,5 +1,5 @@
 import { API_BASE_URL } from '../config';
-import type { Notaire, VilleInteret, Contact, NotaireStatut } from '../types';
+import type { Notaire, VilleInteret, Contact, NotaireStatut, GeocodingHistory } from '../types';
 
 interface SheetData {
   notaires: Notaire[];
@@ -189,9 +189,18 @@ function parseNotaire(row: any[]): Notaire {
   // Construire l'adresse complète pour la comparaison
   const adresseComplete = `${adresse}, ${codePostal} ${ville}`.toLowerCase().trim();
   
+  // Parser l'historique de géocodage
+  let parsedGeocodingHistory: GeocodingHistory[] = [];
+  try {
+    parsedGeocodingHistory = geocodingHistory ? JSON.parse(geocodingHistory) : [];
+  } catch (e) {
+    console.warn('Failed to parse geocoding history:', e);
+    parsedGeocodingHistory = [];
+  }
+  
   // Vérifier si l'adresse a changé en comparant avec l'historique de géocodage
-  const adresseAChange = !geocodingHistory || geocodingHistory.length === 0 || 
-    geocodingHistory[geocodingHistory.length - 1].address.toLowerCase().trim() !== adresseComplete;
+  const adresseAChange = !parsedGeocodingHistory || parsedGeocodingHistory.length === 0 || 
+    (parsedGeocodingHistory[parsedGeocodingHistory.length - 1]?.address?.toLowerCase().trim() !== adresseComplete);
 
   console.log('Adresse complète:', adresseComplete);
   console.log('Adresse a changé:', adresseAChange);
@@ -200,40 +209,22 @@ function parseNotaire(row: any[]): Notaire {
   // Déterminer si le géocodage est nécessaire
   const shouldGeocode = !latitude || !longitude || adresseAChange;
 
-  console.log('Géocodage nécessaire:', shouldGeocode, {
-    pasDeLatitude: !latitude,
-    pasDeLongitude: !longitude,
-    adresseAChange
-  });
-
   // Fonction utilitaire pour parser les nombres
   const parseNumber = (value: any): number | undefined => {
-    console.log('Parsing number value:', value, 'type:', typeof value);
     if (value === undefined || value === null || value === '') {
-      console.log('Empty value, returning undefined');
       return undefined;
     }
-    // Gérer les cas où la valeur est une chaîne avec des virgules ou des points
     const cleanValue = String(value).trim().replace(/,/g, '.');
-    console.log('Cleaned value:', cleanValue);
     const num = Number(cleanValue);
-    console.log('Parsed number:', num, 'isNaN:', isNaN(num));
     return isNaN(num) ? undefined : num;
   };
 
   // Fonction utilitaire pour parser les coordonnées
   const parseCoordinate = (value: any): number | undefined => {
-    console.log('Parsing coordinate:', value, 'type:', typeof value);
     const num = parseNumber(value);
-    // Vérifier que la coordonnée est dans une plage valide
-    if (num !== undefined) {
-      if (num >= -180 && num <= 180) {
-        console.log('Valid coordinate:', num);
-        return num;
-      }
-      console.warn(`Invalid coordinate value: ${value}, parsed as: ${num}`);
+    if (num !== undefined && num >= -180 && num <= 180) {
+      return num;
     }
-    console.log('Returning undefined for coordinate');
     return undefined;
   };
 
@@ -251,14 +242,11 @@ function parseNotaire(row: any[]): Notaire {
   const parseContacts = (value: any): Contact[] => {
     if (!value || value === '[]') return [];
     try {
-      // Si c'est déjà un tableau, le retourner
       if (Array.isArray(value)) return value;
-      // Si c'est une chaîne JSON, essayer de la parser
       if (typeof value === 'string') {
         try {
           return JSON.parse(value);
         } catch {
-          // Si ce n'est pas du JSON valide, créer un contact avec le texte comme commentaire
           return [{
             date: new Date().toISOString(),
             type: 'initial',
@@ -331,7 +319,7 @@ function parseNotaire(row: any[]): Notaire {
     notairesAssocies: notairesAssocies || '',
     notairesSalaries: notairesSalaries || '',
     geoScore: parseNumber(geoScore),
-    geocodingHistory: geocodingHistory ? JSON.parse(geocodingHistory) : [],
+    geocodingHistory: parsedGeocodingHistory,
     geoStatus: shouldGeocode ? 'pending' : 'success'
   };
 
