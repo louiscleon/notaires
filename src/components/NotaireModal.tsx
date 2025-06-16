@@ -147,8 +147,15 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     };
     setEditedNotaire(updatedNotaire);
 
-    // Sauvegarder immédiatement
-    await saveAndSync(updatedNotaire);
+    // Annuler le timeout précédent s'il existe
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Créer un nouveau timeout pour sauvegarder
+    saveTimeoutRef.current = setTimeout(async () => {
+      await saveAndSync(updatedNotaire);
+    }, 1000); // Augmenter le délai à 1 seconde pour réduire le nombre de requêtes
 
     if (name === 'adresse') {
       setShowSuggestions(true);
@@ -227,7 +234,6 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   const saveAndSync = async (updatedNotaire: Notaire) => {
     try {
       setSaveError(null);
-      // Utiliser la fonction onSave qui va gérer la sauvegarde et le rechargement
       await onSave(updatedNotaire);
     } catch (error) {
       console.error('Erreur lors de la synchronisation avec Google Sheets:', error);
@@ -240,6 +246,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     setEditedNotaire(notaire);
   }, [notaire]);
 
+  // Nettoyer le timeout lors du démontage du composant
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {

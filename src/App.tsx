@@ -282,19 +282,16 @@ const App: React.FC = () => {
       // Sauvegarder dans Google Sheets
       await googleSheetsService.saveToSheet(updatedNotaire);
       
-      // Recharger les données depuis Google Sheets
-      const { notaires: updatedNotaires } = await googleSheetsService.loadFromSheet();
-      
-      // Mettre à jour l'état avec les données fraîches
-      setNotaires(updatedNotaires);
+      // Mettre à jour l'état local directement
+      const newNotaires = notaires.map(n => n.id === updatedNotaire.id ? updatedNotaire : n);
+      setNotaires(newNotaires);
       
       // Mettre à jour le notaire sélectionné si c'est celui qui a été modifié
       if (selectedNotaire && selectedNotaire.id === updatedNotaire.id) {
-        const freshNotaire = updatedNotaires.find(n => n.id === updatedNotaire.id);
-        if (freshNotaire) {
-          setSelectedNotaire(freshNotaire);
-        }
+        setSelectedNotaire(updatedNotaire);
       }
+
+      addToast('Modifications sauvegardées avec succès', 'success');
     } catch (error) {
       console.error('Erreur lors de la mise à jour du notaire:', error);
       addToast('Erreur lors de la mise à jour du notaire', 'error');
