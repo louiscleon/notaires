@@ -179,12 +179,18 @@ export async function testConfig() {
 export async function readSheetData(range: string) {
   try {
     console.log('Reading sheet data:', { range });
-    const response = await fetch(`/api/sheets?range=${encodeURIComponent(range)}`);
+    const apiUrl = '/api/sheets';
+    console.log('API URL:', apiUrl);
+    
+    const response = await fetch(`${apiUrl}?range=${encodeURIComponent(range)}`);
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+    
     const text = await response.text();
     console.log('Raw API response:', text);
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
     }
 
     let data;
@@ -193,7 +199,7 @@ export async function readSheetData(range: string) {
       console.log('Parsed API response:', data);
     } catch (parseError: any) {
       console.error('Failed to parse JSON:', parseError);
-      throw new Error(`Failed to parse JSON: ${parseError.message}`);
+      throw new Error(`Failed to parse JSON: ${parseError.message}, raw response: ${text}`);
     }
 
     if (!data || !data.data) {
