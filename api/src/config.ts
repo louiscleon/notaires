@@ -11,14 +11,15 @@ function safeStringify(obj: any): string {
 
 console.log('Initializing Google Sheets API configuration...');
 
-if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
-  console.error('GOOGLE_SERVICE_ACCOUNT_KEY is not set');
-  throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY environment variable is not set');
+const SERVICE_ACCOUNT_KEY = process.env.REACT_APP_GOOGLE_SERVICE_ACCOUNT_KEY || process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+if (!SERVICE_ACCOUNT_KEY) {
+  console.error('SERVICE_ACCOUNT_KEY is not set');
+  throw new Error('SERVICE_ACCOUNT_KEY environment variable is not set');
 }
 
 let credentials;
 try {
-  credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
+  credentials = JSON.parse(SERVICE_ACCOUNT_KEY);
   console.log('Service account credentials parsed:', {
     type: credentials.type,
     projectId: credentials.project_id,
@@ -27,8 +28,8 @@ try {
     clientEmail: credentials.client_email
   });
 } catch (error) {
-  console.error('Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY:', error);
-  throw new Error('Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY as JSON');
+  console.error('Failed to parse SERVICE_ACCOUNT_KEY:', error);
+  throw new Error('Failed to parse SERVICE_ACCOUNT_KEY as JSON');
 }
 
 if (!credentials.private_key || !credentials.client_email) {
@@ -48,7 +49,7 @@ const auth = new GoogleAuth({
 console.log('Creating Google Sheets client...');
 export const sheets = google.sheets({ version: 'v4', auth });
 
-export const SPREADSHEET_ID = process.env.REACT_APP_SPREADSHEET_ID;
+export const SPREADSHEET_ID = process.env.REACT_APP_GOOGLE_SHEETS_API_KEY;
 console.log('Configuration complete:', {
   hasSpreadsheetId: !!SPREADSHEET_ID,
   spreadsheetId: SPREADSHEET_ID,
