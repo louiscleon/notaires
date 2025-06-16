@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Notaire, NotaireStatut, Contact, ContactStatut, AdresseSuggestion } from '../types';
 import { searchAdresse } from '../services/adresse';
 import { geocodeAddress } from '../services/geocoding';
-import { googleSheetsService } from '../services/googleSheets';
 
 interface NotaireDetailProps {
   notaire: Notaire;
@@ -99,7 +98,6 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
           latitude: result.lat,
           longitude: result.lon,
           display_name: result.display_name,
-          dateModification: new Date().toISOString()
         };
         
         onUpdate(updatedNotaire);
@@ -110,12 +108,7 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
         return;
       }
     } else {
-      const updatedNotaire = {
-        ...editedNotaire,
-        dateModification: new Date().toISOString()
-      };
-      
-      onUpdate(updatedNotaire);
+      onUpdate(editedNotaire);
       setIsEditing(false);
     }
   };
@@ -150,7 +143,6 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
       contacts: [...notaire.contacts, contact],
       dateModification: new Date().toISOString()
     };
-
     onUpdate(updatedNotaire);
     setShowContactForm(false);
     setNewContact({
@@ -181,13 +173,11 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
 
     updatedContacts[index] = { ...currentContact, ...updates };
 
-    const updatedNotaire = {
+    onUpdate({
       ...notaire,
       contacts: updatedContacts,
       dateModification: new Date().toISOString()
-    };
-
-    onUpdate(updatedNotaire);
+    });
   };
 
   if (!isOpen) return null;

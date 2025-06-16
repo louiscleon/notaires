@@ -30,10 +30,6 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isEditing, setIsEditing] = useState(false);
-  const [lastUpdateTime, setLastUpdateTime] = useState<number>(0);
-  const [updateQueue, setUpdateQueue] = useState<Notaire[]>([]);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const UPDATE_COOLDOWN = 2000; // 2 secondes de délai entre les mises à jour
 
   const addToast = (message: string, type: 'error' | 'success' | 'warning') => {
     const id = Date.now();
@@ -177,74 +173,9 @@ const App: React.FC = () => {
     checkConfig();
   }, []);
 
-  // Fonction pour traiter la file d'attente des mises à jour
-  const processUpdateQueue = async () => {
-    if (isUpdating || updateQueue.length === 0) return;
-
-    setIsUpdating(true);
-    const now = Date.now();
-    if (now - lastUpdateTime < UPDATE_COOLDOWN) {
-      // Attendre le délai avant de traiter la prochaine mise à jour
-      setTimeout(() => {
-        setIsUpdating(false);
-        processUpdateQueue();
-      }, UPDATE_COOLDOWN - (now - lastUpdateTime));
-      return;
-    }
-
-    const notaireToUpdate = updateQueue[0];
-    setLastUpdateTime(now);
-
-    try {
-      // Mettre à jour l'état local immédiatement pour une meilleure UX
-      setNotaires(prevNotaires => 
-        prevNotaires.map(n => n.id === notaireToUpdate.id ? notaireToUpdate : n)
-      );
-
-      // Sauvegarder dans Google Sheets
-      await googleSheetsService.saveToSheet(notaireToUpdate);
-
-      // Supprimer tous les messages existants avant d'en ajouter un nouveau
-      setToasts([]);
-      addToast('Modifications sauvegardées avec succès', 'success');
-
-      // Retirer la mise à jour traitée de la file d'attente
-      setUpdateQueue(prev => prev.slice(1));
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour:', error);
-      setToasts([]);
-      addToast(
-        error instanceof Error 
-          ? `Erreur lors de la sauvegarde : ${error.message}`
-          : 'Erreur lors de la sauvegarde',
-        'error'
-      );
-    } finally {
-      setIsUpdating(false);
-      // Traiter la prochaine mise à jour si la file n'est pas vide
-      if (updateQueue.length > 1) {
-        processUpdateQueue();
-      }
-    }
-  };
-
-  // Effet pour traiter la file d'attente quand elle change
-  useEffect(() => {
-    processUpdateQueue();
-  }, [updateQueue]);
-
-  const handleNotaireUpdate = async (updatedNotaire: Notaire) => {
-    // Ajouter la mise à jour à la file d'attente
-    setUpdateQueue(prev => [...prev, updatedNotaire]);
-  };
-
-  const handleStatutChange = async (notaire: Notaire, newStatut: NotaireStatut) => {
-    const updatedNotaire = { 
-      ...notaire, 
-      statut: newStatut, 
-      dateModification: new Date().toISOString() 
-    };
-    await handleNotaireUpdate(updatedNotaire);
+  const handleStatutChange = (notaire: Notaire, newStatut: NotaireStatut) => {
+    const updatedNotaire = { ...notaire, statut: newStatut, dateModification: new Date().toISOString() };
+    setNotaires(notaires.map(n => n.id === notaire.id ? updatedNotaire : n));
   };
 
   const notairesFiltres = useMemo(() => {
@@ -343,6 +274,12 @@ const App: React.FC = () => {
 
   const handleCloseModal = () => {
     setSelectedNotaire(null);
+  };
+
+  const handleNotaireUpdate = (updatedNotaire: Notaire) => {
+    const newNotaires = notaires.map(n => n.id === updatedNotaire.id ? updatedNotaire : n);
+    setNotaires(newNotaires);
+    // La synchronisation sera faite automatiquement par le composant qui a fait la mise à jour
   };
 
   const handleFiltresChange = (newFiltres: Filtres) => {
@@ -462,13 +399,13 @@ const App: React.FC = () => {
                       console.log('[DEBUG] Aucune ville d\'intérêt dans filtres.villesInteret');
                     }
                     return (
-                      <MapComponent
-                        notaires={notairesFiltres}
-                        villesInteret={filtres.villesInteret}
-                        onNotaireClick={handleNotaireClick}
-                        onNotaireUpdate={handleNotaireUpdate}
-                        showOnlyInRadius={filtres.showOnlyInRadius}
-                      />
+                  <MapComponent
+                    notaires={notairesFiltres}
+                    villesInteret={filtres.villesInteret}
+                    onNotaireClick={handleNotaireClick}
+                    onNotaireUpdate={handleNotaireUpdate}
+                    showOnlyInRadius={filtres.showOnlyInRadius}
+                  />
                     );
                   })()}
                 </div>
