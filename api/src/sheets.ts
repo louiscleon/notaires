@@ -1,6 +1,28 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sheets, SPREADSHEET_ID } from './config';
 
+// Configuration du rate limiting
+const RATE_LIMIT = {
+  MAX_REQUESTS_PER_MINUTE: 50,
+  BATCH_SIZE: 10,
+  DELAY_BETWEEN_REQUESTS: 2000, // 2 secondes entre chaque requête
+};
+
+// Gestion du rate limiting
+let lastRequestTime = 0;
+async function checkRateLimit(): Promise<void> {
+  const now = Date.now();
+  const timeSinceLastRequest = now - lastRequestTime;
+  
+  if (timeSinceLastRequest < RATE_LIMIT.DELAY_BETWEEN_REQUESTS) {
+    await new Promise(resolve => 
+      setTimeout(resolve, RATE_LIMIT.DELAY_BETWEEN_REQUESTS - timeSinceLastRequest)
+    );
+  }
+  
+  lastRequestTime = now;
+}
+
 function safeStringify(obj: any): string {
   try {
     return JSON.stringify(obj, null, 2);
@@ -42,6 +64,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         message: 'Spreadsheet ID is not configured'
       });
     }
+
+    // Vérifier le rate limit avant chaque requête
+    await checkRateLimit();
 
     switch (req.method) {
       case 'GET': {
@@ -86,6 +111,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(200).json(response.data.values);
         } catch (e) {
           const error = e as Error;
+          
+          // Vérifier si c'est une erreur de quota
+          if (error.message.includes('Quota exceeded')) {
+            return res.status(429).json({
+              error: 'Rate Limit Exceeded',
+              message: 'Too many requests. Please try again later.',
+              retryAfter: RATE_LIMIT.DELAY_BETWEEN_REQUESTS
+            });
+          }
+
           console.error('Google Sheets API Error:', {
             message: error.message,
             stack: error.stack,
@@ -164,6 +199,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
         } catch (e) {
           const error = e as Error;
+
+          // Vérifier si c'est une erreur de quota
+          if (error.message.includes('Quota exceeded')) {
+            return res.status(429).json({
+              error: 'Rate Limit Exceeded',
+              message: 'Too many requests. Please try again later.',
+              retryAfter: RATE_LIMIT.DELAY_BETWEEN_REQUESTS
+            });
+          }
+
           console.error('Google Sheets API Error:', {
             message: error.message,
             stack: error.stack,

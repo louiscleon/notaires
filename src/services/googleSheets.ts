@@ -12,35 +12,97 @@ const SHEET_RANGES = {
   VILLES_INTERET: 'VillesInteret!A2:G'
 } as const;
 
-async function fetchWithCors(url: string, options?: RequestInit): Promise<Response> {
-  try {
-    const response = await fetch(url, {
-      ...options,
-      mode: 'cors',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...options?.headers,
-      },
-    });
+// Configuration du rate limiting
+const RATE_LIMIT = {
+  MAX_REQUESTS_PER_MINUTE: 50,
+  BATCH_SIZE: 10,
+  DELAY_BETWEEN_REQUESTS: 2000, // 2 secondes entre chaque requête
+};
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      if (errorText.trim().startsWith('<!DOCTYPE html>')) {
-        throw new Error('Received HTML response instead of JSON. The API endpoint might be incorrect or the server might be down.');
+// File d'attente pour les requêtes
+let requestQueue: Array<() => Promise<void>> = [];
+let isProcessingQueue = false;
+
+// Timestamp de la dernière requête
+let lastRequestTime = 0;
+
+async function processQueue() {
+  if (isProcessingQueue) return;
+  isProcessingQueue = true;
+
+  while (requestQueue.length > 0) {
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastRequestTime;
+    
+    if (timeSinceLastRequest < RATE_LIMIT.DELAY_BETWEEN_REQUESTS) {
+      await new Promise(resolve => 
+        setTimeout(resolve, RATE_LIMIT.DELAY_BETWEEN_REQUESTS - timeSinceLastRequest)
+      );
+    }
+
+    const request = requestQueue.shift();
+    if (request) {
+      try {
+        await request();
+      } catch (error) {
+        console.error('Error processing queued request:', error);
       }
-      
-      throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+      lastRequestTime = Date.now();
     }
-
-    return response;
-  } catch (error) {
-    if (error instanceof TypeError && error.message.includes('CORS')) {
-      throw new Error('Erreur de connexion à l\'API. Veuillez vérifier que l\'API est bien déployée et accessible.');
-    }
-    throw error;
   }
+
+  isProcessingQueue = false;
+}
+
+async function queueRequest<T>(request: () => Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const wrappedRequest = async () => {
+      try {
+        const result = await request();
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    };
+
+    requestQueue.push(wrappedRequest);
+    processQueue();
+  });
+}
+
+async function fetchWithCors(url: string, options?: RequestInit): Promise<Response> {
+  const request = async () => {
+    try {
+      const response = await fetch(url, {
+        ...options,
+        mode: 'cors',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...options?.headers,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (errorText.trim().startsWith('<!DOCTYPE html>')) {
+          throw new Error('Received HTML response instead of JSON. The API endpoint might be incorrect or the server might be down.');
+        }
+        
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+      }
+
+      return response;
+    } catch (error) {
+      if (error instanceof TypeError && error.message.includes('CORS')) {
+        throw new Error('Erreur de connexion à l\'API. Veuillez vérifier que l\'API est bien déployée et accessible.');
+      }
+      throw error;
+    }
+  };
+
+  return queueRequest(request);
 }
 
 async function parseJsonResponse(response: Response): Promise<any> {
@@ -89,61 +151,63 @@ export const googleSheetsService = {
         if (!n.officeNotarial) throw new Error('Notaire sans nom d\'office');
       });
 
-      // Convertir les notaires en tableau de valeurs pour Google Sheets
-      const values = notaires.map(notaire => {
-        // S'assurer que toutes les valeurs sont définies
-        const row = [
-          notaire.id || '',
-          notaire.officeNotarial || '',
-          notaire.adresse || '',
-          notaire.codePostal || '',
-          notaire.ville || '',
-          notaire.departement || '',
-          notaire.email || '',
-          notaire.notairesAssocies || '',
-          notaire.notairesSalaries || '',
-          notaire.nbAssocies || 0,
-          notaire.nbSalaries || 0,
-          notaire.serviceNego ? 'oui' : 'non',
-          notaire.statut || 'non_defini',
-          notaire.notes || '',
-          JSON.stringify(notaire.contacts || []),
-          notaire.dateModification || new Date().toISOString(),
-          notaire.latitude || 0,
-          notaire.longitude || 0,
-          notaire.geoScore || 0,
-          JSON.stringify(notaire.geocodingHistory || [])
-        ];
+      // Diviser les notaires en lots pour respecter le rate limiting
+      const batches: Notaire[][] = [];
+      for (let i = 0; i < notaires.length; i += RATE_LIMIT.BATCH_SIZE) {
+        batches.push(notaires.slice(i, i + RATE_LIMIT.BATCH_SIZE));
+      }
 
-        // Vérifier qu'il n'y a pas de valeurs undefined ou null
-        if (row.some(val => val === undefined || val === null)) {
-          throw new Error(`Données invalides pour le notaire ${notaire.id}`);
+      // Traiter chaque lot séquentiellement
+      for (const batch of batches) {
+        const values = batch.map(notaire => {
+          const row = [
+            notaire.id || '',
+            notaire.officeNotarial || '',
+            notaire.adresse || '',
+            notaire.codePostal || '',
+            notaire.ville || '',
+            notaire.departement || '',
+            notaire.email || '',
+            notaire.notairesAssocies || '',
+            notaire.notairesSalaries || '',
+            notaire.nbAssocies || 0,
+            notaire.nbSalaries || 0,
+            notaire.serviceNego ? 'oui' : 'non',
+            notaire.statut || 'non_defini',
+            notaire.notes || '',
+            JSON.stringify(notaire.contacts || []),
+            notaire.dateModification || new Date().toISOString(),
+            notaire.latitude || 0,
+            notaire.longitude || 0,
+            notaire.geoScore || 0,
+            JSON.stringify(notaire.geocodingHistory || [])
+          ];
+
+          if (row.some(val => val === undefined || val === null)) {
+            throw new Error(`Données invalides pour le notaire ${notaire.id}`);
+          }
+
+          return row;
+        });
+
+        const response = await fetchWithCors(`${API_BASE_URL}/sheets`, {
+          method: 'POST',
+          body: JSON.stringify({ 
+            range: SHEET_RANGES.NOTAIRES,
+            values
+          }),
+        });
+
+        const data = await parseJsonResponse(response);
+        
+        if (!data || typeof data !== 'object') {
+          throw new Error('Réponse invalide du serveur');
         }
 
-        return row;
-      });
-
-      const response = await fetchWithCors(`${API_BASE_URL}/sheets`, {
-        method: 'POST',
-        body: JSON.stringify({ 
-          range: SHEET_RANGES.NOTAIRES,
-          values
-        }),
-      });
-
-      const data = await parseJsonResponse(response);
-      
-      // Vérifier la réponse
-      if (!data || typeof data !== 'object') {
-        throw new Error('Réponse invalide du serveur');
+        if (data.error) {
+          throw new Error(`Erreur lors de la sauvegarde: ${data.error}`);
+        }
       }
-
-      // Vérifier si la sauvegarde a réussi
-      if (data.error) {
-        throw new Error(`Erreur lors de la sauvegarde: ${data.error}`);
-      }
-
-      return data;
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
       throw error;
@@ -168,12 +232,10 @@ export const googleSheetsService = {
 
       const data = await parseJsonResponse(response);
       
-      // Vérifier la réponse
       if (!data || typeof data !== 'object') {
         throw new Error('Réponse invalide du serveur');
       }
 
-      // Vérifier si la sauvegarde a réussi
       if (data.error) {
         throw new Error(`Erreur lors de la sauvegarde: ${data.error}`);
       }
