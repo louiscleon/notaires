@@ -315,8 +315,8 @@ function parseVilleInteret(row: any[]): VilleInteret {
     id: row[0] || '',
     nom: row[1] || '',
     rayon: Number(row[2]) || 15,
-    latitude: Number(row[3]) || 0,
-    longitude: Number(row[4]) || 0,
+    latitude: row[3] ? Number(String(row[3]).replace(',', '.')) : 0,
+    longitude: row[4] ? Number(String(row[4]).replace(',', '.')) : 0,
     departement: row[5] || '',
     population: row[6] ? Number(row[6]) : undefined
   };
