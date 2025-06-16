@@ -43,6 +43,7 @@ interface VilleInteret {
 }
 
 function parseNotaire(row: any[]): Notaire {
+  console.log('Parsing notaire row:', row);
   const [
     id,
     officeNotarial,
@@ -67,6 +68,31 @@ function parseNotaire(row: any[]): Notaire {
     geoScore,
     geocodingHistory
   ] = row;
+
+  console.log('Raw values:', {
+    id,
+    officeNotarial,
+    adresse,
+    codePostal,
+    ville,
+    departement,
+    telephone,
+    email,
+    siteWeb,
+    latitude,
+    longitude,
+    statut,
+    notes,
+    contacts,
+    dateModification,
+    nbAssocies,
+    nbSalaries,
+    serviceNego,
+    notairesAssocies,
+    notairesSalaries,
+    geoScore,
+    geocodingHistory
+  });
 
   const notaire = {
     id: id || `notaire_${Date.now()}`,
@@ -96,8 +122,8 @@ function parseNotaire(row: any[]): Notaire {
     geoScore: geoScore ? parseFloat(geoScore) : undefined,
     geocodingHistory: geocodingHistory ? JSON.parse(geocodingHistory) : []
   };
-  // Log détaillé pour debug
-  console.log(`[DEBUG][parseNotaire] id: ${notaire.id}, office: ${notaire.officeNotarial}, lat: ${notaire.latitude}, lon: ${notaire.longitude}`);
+
+  console.log('Parsed notaire:', notaire);
   return notaire;
 }
 
