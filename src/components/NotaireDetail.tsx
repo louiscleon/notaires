@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Notaire, NotaireStatut, Contact, ContactStatut, AdresseSuggestion } from '../types';
 import { searchAdresse } from '../services/adresse';
 import { geocodeAddress } from '../services/geocoding';
+import { googleSheetsService } from '../services/googleSheets';
 
 interface NotaireDetailProps {
   notaire: Notaire;
@@ -98,18 +99,35 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
           latitude: result.lat,
           longitude: result.lon,
           display_name: result.display_name,
+          dateModification: new Date().toISOString()
         };
         
-        onUpdate(updatedNotaire);
-        setGeocodingStatus('Géocodage réussi !');
-        setIsEditing(false);
+        try {
+          await googleSheetsService.saveToSheet(updatedNotaire);
+          onUpdate(updatedNotaire);
+          setGeocodingStatus('Géocodage et sauvegarde réussis !');
+          setIsEditing(false);
+        } catch (error) {
+          console.error('Erreur lors de la sauvegarde:', error);
+          setGeocodingStatus('Erreur lors de la sauvegarde');
+        }
       } catch (error) {
         setGeocodingStatus('Erreur lors du géocodage');
         return;
       }
     } else {
-      onUpdate(editedNotaire);
-      setIsEditing(false);
+      try {
+        const updatedNotaire = {
+          ...editedNotaire,
+          dateModification: new Date().toISOString()
+        };
+        await googleSheetsService.saveToSheet(updatedNotaire);
+        onUpdate(updatedNotaire);
+        setIsEditing(false);
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde:', error);
+        setGeocodingStatus('Erreur lors de la sauvegarde');
+      }
     }
   };
 

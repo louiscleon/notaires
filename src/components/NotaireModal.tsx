@@ -142,19 +142,13 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     const updatedNotaire = {
       ...editedNotaire,
       [name]: value,
-      id: editedNotaire.id // Forcer l'ID à être conservé
+      id: editedNotaire.id, // Forcer l'ID à être conservé
+      dateModification: new Date().toISOString()
     };
     setEditedNotaire(updatedNotaire);
 
-    // Annuler le timeout précédent s'il existe
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    // Créer un nouveau timeout pour sauvegarder
-    saveTimeoutRef.current = setTimeout(async () => {
-      await saveAndSync(updatedNotaire);
-    }, 500);
+    // Sauvegarder immédiatement
+    await saveAndSync(updatedNotaire);
 
     if (name === 'adresse') {
       setShowSuggestions(true);
@@ -233,8 +227,10 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   const saveAndSync = async (updatedNotaire: Notaire) => {
     try {
       setSaveError(null);
-      onSave(updatedNotaire);
+      // Sauvegarder d'abord dans Google Sheets
       await googleSheetsService.saveToSheet(updatedNotaire);
+      // Puis mettre à jour l'état local
+      onSave(updatedNotaire);
     } catch (error) {
       console.error('Erreur lors de la synchronisation avec Google Sheets:', error);
       setSaveError('Erreur lors de la sauvegarde. Les modifications seront perdues au rechargement de la page.');
