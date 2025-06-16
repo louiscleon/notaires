@@ -65,9 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           if (!response.data.values) {
             console.log('No values in response, returning empty array');
-            return res.status(200).json({
-              data: []
-            });
+            return res.status(200).json([]);
           }
 
           const result = {
@@ -78,10 +76,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           };
           console.log('Data fetched successfully:', safeStringify(result));
 
-          // Ensure we're sending a properly formatted JSON response
-          return res.status(200).json({
-            data: response.data.values
-          });
+          // Return the values array directly
+          return res.status(200).json(response.data.values);
         } catch (e) {
           const error = e as Error;
           console.error('Google Sheets API Error:', {
