@@ -183,9 +183,13 @@ const App: React.FC = () => {
       // Sauvegarder dans Google Sheets
       await googleSheetsService.saveToSheet(updatedNotaire);
 
+      // Supprimer les messages de succès existants avant d'en ajouter un nouveau
+      setToasts(prevToasts => prevToasts.filter(toast => toast.type !== 'success'));
       addToast('Modifications sauvegardées avec succès', 'success');
     } catch (error) {
       console.error('Erreur lors de la mise à jour:', error);
+      // Supprimer les messages d'erreur existants avant d'en ajouter un nouveau
+      setToasts(prevToasts => prevToasts.filter(toast => toast.type !== 'error'));
       addToast(
         error instanceof Error 
           ? `Erreur lors de la sauvegarde : ${error.message}`
