@@ -9,9 +9,23 @@ function safeStringify(obj: any): string {
   }
 }
 
+function validateValues(values: any[][]): boolean {
+  if (!Array.isArray(values)) return false;
+  if (values.length === 0) return false;
+  
+  // Vérifier que chaque ligne a le bon nombre de colonnes
+  const expectedColumns = 20; // Nombre de colonnes attendu
+  return values.every(row => 
+    Array.isArray(row) && 
+    row.length === expectedColumns &&
+    row.every(cell => cell !== undefined && cell !== null)
+  );
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Ensure we always send JSON responses
   res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
 
   try {
     // Log request details
@@ -93,6 +107,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
         }
 
+        // Valider les données avant l'écriture
+        if (!validateValues(values)) {
+          return res.status(400).json({
+            error: 'Validation Error',
+            message: 'Invalid data format'
+          });
+        }
+
         console.log('Writing data:', {
           range: writeRange,
           valueCount: values.length,
@@ -102,6 +124,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
         try {
+          // Vérifier d'abord que la plage existe
+          const checkResponse = await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: writeRange,
+          });
+
+          if (!checkResponse.data) {
+            throw new Error('Failed to verify range');
+          }
+
           const writeResponse = await sheets.spreadsheets.values.update({
             spreadsheetId: SPREADSHEET_ID,
             range: writeRange,
@@ -109,9 +141,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             requestBody: { values },
           });
 
+          if (!writeResponse.data || !writeResponse.data.updatedCells) {
+            throw new Error('No cells were updated');
+          }
+
           console.log('Data written successfully:', safeStringify(writeResponse.data));
+          
+          // Vérifier que les données ont bien été écrites
+          const verifyResponse = await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: writeRange,
+          });
+
+          if (!verifyResponse.data || !verifyResponse.data.values) {
+            throw new Error('Failed to verify written data');
+          }
+
           return res.status(200).json({
-            data: writeResponse.data
+            success: true,
+            data: writeResponse.data,
+            updatedCells: writeResponse.data.updatedCells
           });
         } catch (e) {
           const error = e as Error;
@@ -133,18 +182,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           message: `Method ${req.method} is not supported`
         });
     }
-  } catch (error) {
-    // Log the full error
-    console.error('Unexpected API Error:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
+  } catch (e) {
+    const error = e as Error;
+    console.error('Unexpected error:', {
+      message: error.message,
+      stack: error.stack,
       error: safeStringify(error)
     });
-
-    // Send a detailed error response
     return res.status(500).json({
       error: 'Internal Server Error',
-      message: error instanceof Error ? error.message : 'An unexpected error occurred'
+      message: error.message || 'An unexpected error occurred'
     });
   }
 } 

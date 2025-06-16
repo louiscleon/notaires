@@ -219,10 +219,10 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
     if (hasUnsavedChanges.current) {
       try {
         await saveAndSync(editedNotaire);
-        // Attendre que la sauvegarde soit terminée avant de fermer
-        await new Promise(resolve => setTimeout(resolve, 500));
       } catch (error) {
         console.error('Erreur lors de la sauvegarde finale:', error);
+        setGeocodingStatus('Erreur lors de la sauvegarde. Veuillez réessayer avant de fermer.');
+        return; // Ne pas fermer si la sauvegarde a échoué
       }
     }
     onClose();

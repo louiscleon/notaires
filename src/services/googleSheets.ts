@@ -74,6 +74,7 @@ export const googleSheetsService = {
 
       return { notaires, villesInteret };
     } catch (error) {
+      console.error('Erreur lors du chargement des données:', error);
       throw error;
     }
   },
@@ -82,29 +83,45 @@ export const googleSheetsService = {
     try {
       const notaires = Array.isArray(notaire) ? notaire : [notaire];
 
+      // Valider les données avant l'envoi
+      notaires.forEach(n => {
+        if (!n.id) throw new Error('Notaire sans ID');
+        if (!n.officeNotarial) throw new Error('Notaire sans nom d\'office');
+      });
+
       // Convertir les notaires en tableau de valeurs pour Google Sheets
-      const values = notaires.map(notaire => [
-        notaire.id,
-        notaire.officeNotarial,
-        notaire.adresse,
-        notaire.codePostal,
-        notaire.ville,
-        notaire.departement,
-        notaire.email,
-        notaire.notairesAssocies,
-        notaire.notairesSalaries,
-        notaire.nbAssocies,
-        notaire.nbSalaries,
-        notaire.serviceNego ? 'oui' : 'non',
-        notaire.statut,
-        notaire.notes,
-        JSON.stringify(notaire.contacts),
-        notaire.dateModification,
-        notaire.latitude,
-        notaire.longitude,
-        notaire.geoScore,
-        JSON.stringify(notaire.geocodingHistory)
-      ]);
+      const values = notaires.map(notaire => {
+        // S'assurer que toutes les valeurs sont définies
+        const row = [
+          notaire.id || '',
+          notaire.officeNotarial || '',
+          notaire.adresse || '',
+          notaire.codePostal || '',
+          notaire.ville || '',
+          notaire.departement || '',
+          notaire.email || '',
+          notaire.notairesAssocies || '',
+          notaire.notairesSalaries || '',
+          notaire.nbAssocies || 0,
+          notaire.nbSalaries || 0,
+          notaire.serviceNego ? 'oui' : 'non',
+          notaire.statut || 'non_defini',
+          notaire.notes || '',
+          JSON.stringify(notaire.contacts || []),
+          notaire.dateModification || new Date().toISOString(),
+          notaire.latitude || 0,
+          notaire.longitude || 0,
+          notaire.geoScore || 0,
+          JSON.stringify(notaire.geocodingHistory || [])
+        ];
+
+        // Vérifier qu'il n'y a pas de valeurs undefined ou null
+        if (row.some(val => val === undefined || val === null)) {
+          throw new Error(`Données invalides pour le notaire ${notaire.id}`);
+        }
+
+        return row;
+      });
 
       const response = await fetchWithCors(`${API_BASE_URL}/sheets`, {
         method: 'POST',
@@ -115,13 +132,32 @@ export const googleSheetsService = {
       });
 
       const data = await parseJsonResponse(response);
+      
+      // Vérifier la réponse
+      if (!data || typeof data !== 'object') {
+        throw new Error('Réponse invalide du serveur');
+      }
+
+      // Vérifier si la sauvegarde a réussi
+      if (data.error) {
+        throw new Error(`Erreur lors de la sauvegarde: ${data.error}`);
+      }
+
+      return data;
     } catch (error) {
+      console.error('Erreur lors de la sauvegarde:', error);
       throw error;
     }
   },
 
   async saveVillesInteret(villesInteret: VilleInteret[]): Promise<void> {
     try {
+      // Valider les données avant l'envoi
+      villesInteret.forEach(v => {
+        if (!v.id) throw new Error('Ville sans ID');
+        if (!v.nom) throw new Error('Ville sans nom');
+      });
+
       const response = await fetchWithCors(`${API_BASE_URL}/sheets/villes-interet`, {
         method: 'POST',
         body: JSON.stringify({ 
@@ -131,7 +167,20 @@ export const googleSheetsService = {
       });
 
       const data = await parseJsonResponse(response);
+      
+      // Vérifier la réponse
+      if (!data || typeof data !== 'object') {
+        throw new Error('Réponse invalide du serveur');
+      }
+
+      // Vérifier si la sauvegarde a réussi
+      if (data.error) {
+        throw new Error(`Erreur lors de la sauvegarde: ${data.error}`);
+      }
+
+      return data;
     } catch (error) {
+      console.error('Erreur lors de la sauvegarde des villes:', error);
       throw error;
     }
   },
@@ -142,6 +191,7 @@ export const googleSheetsService = {
       const data = await parseJsonResponse(response);
       return data;
     } catch (error) {
+      console.error('Erreur lors du test de configuration:', error);
       throw error;
     }
   }
