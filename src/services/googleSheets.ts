@@ -70,34 +70,21 @@ export const googleSheetsService = {
   async loadFromSheet(): Promise<SheetData> {
     try {
       console.log('=== DEBUG LOAD FROM SHEET ===');
-      console.log('API URL:', `${API_BASE_URL}/sheets?range=${SHEET_RANGES.NOTAIRES}`);
-      
-      const response = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.NOTAIRES}`);
-      console.log('API Response status:', response.status);
-      
-      const data = await parseJsonResponse(response);
-      console.log('Raw sheet data:', data);
-
-      if (!Array.isArray(data)) {
-        console.error('Invalid API response format:', data);
-        throw new Error('Invalid API response format: expected array of rows');
+      // Charger les notaires
+      const responseNotaires = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.NOTAIRES}`);
+      const dataNotaires = await parseJsonResponse(responseNotaires);
+      if (!Array.isArray(dataNotaires)) {
+        throw new Error('Invalid API response format for notaires');
       }
+      const notaires = dataNotaires.map(row => parseNotaire(row));
 
-      console.log('Number of rows received:', data.length);
-      if (data.length > 0) {
-        console.log('First row sample:', data[0]);
+      // Charger les villes d'intérêt
+      const responseVilles = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.VILLES_INTERET}`);
+      const dataVilles = await parseJsonResponse(responseVilles);
+      if (!Array.isArray(dataVilles)) {
+        throw new Error('Invalid API response format for villes d\'intérêt');
       }
-
-      // Convertir les lignes brutes en objets Notaire
-      const notaires = data.map(row => parseNotaire(row));
-      const villesInteret: VilleInteret[] = []; // Pour l'instant, nous ne chargeons pas les villes d'intérêt
-
-      // Vérifier les données des notaires
-      console.log('=== NOTAIRES DATA SUMMARY ===');
-      console.log('Total notaires:', notaires.length);
-      console.log('Notaires with coordinates:', notaires.filter(n => n.latitude !== 0 && n.longitude !== 0).length);
-      console.log('Notaires without coordinates:', notaires.filter(n => n.latitude === 0 || n.longitude === 0).length);
-      console.log('Sample notaire:', notaires[0]);
+      const villesInteret = dataVilles.map(row => parseVilleInteret(row));
 
       return { notaires, villesInteret };
     } catch (error) {
@@ -373,4 +360,17 @@ function parseNotaire(row: any[]): Notaire {
 
   console.log('Parsed notaire:', notaire);
   return notaire;
+}
+
+function parseVilleInteret(row: any[]): VilleInteret {
+  // Colonnes attendues : ID, Nom, Rayon, Latitude, Longitude, Département, Population
+  return {
+    id: row[0] || '',
+    nom: row[1] || '',
+    rayon: Number(row[2]) || 15,
+    latitude: Number(row[3]) || 0,
+    longitude: Number(row[4]) || 0,
+    departement: row[5] || '',
+    population: row[6] ? Number(row[6]) : undefined
+  };
 }
