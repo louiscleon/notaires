@@ -104,11 +104,21 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Mettre à jour l'état local quand le notaire change
   useEffect(() => {
     setEditedNotaire(notaire);
   }, [notaire]);
+
+  // Nettoyer le timeout à la fermeture
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const searchAdresses = async () => {
@@ -142,7 +152,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     }
   };
 
-  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
     const updatedNotaire = {
@@ -151,11 +161,22 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       dateModification: new Date().toISOString()
     };
 
-    try {
-      await saveAndSync(updatedNotaire);
-    } catch (error) {
-      // L'erreur est déjà gérée dans saveAndSync
+    // Mettre à jour l'état local immédiatement
+    setEditedNotaire(updatedNotaire);
+
+    // Annuler le timeout précédent s'il existe
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
     }
+
+    // Créer un nouveau timeout pour la sauvegarde
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await saveAndSync(updatedNotaire);
+      } catch (error) {
+        // L'erreur est déjà gérée dans saveAndSync
+      }
+    }, 1000); // Attendre 1 seconde après la dernière frappe
 
     if (name === 'adresse') {
       setShowSuggestions(true);
@@ -199,6 +220,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       dateModification: new Date().toISOString()
     };
 
+    setEditedNotaire(updatedNotaire);
     try {
       await saveAndSync(updatedNotaire);
     } catch (error) {
@@ -213,6 +235,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       dateModification: new Date().toISOString()
     };
 
+    setEditedNotaire(updatedNotaire);
     try {
       await saveAndSync(updatedNotaire);
     } catch (error) {
@@ -221,6 +244,18 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   };
 
   const handleClose = () => {
+    // Sauvegarder les modifications en attente avant de fermer
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveAndSync(editedNotaire).then(() => {
+        setSaveError(null);
+        onClose();
+      }).catch(() => {
+        setSaveError('Erreur lors de la sauvegarde finale. Voulez-vous réessayer ?');
+      });
+      return;
+    }
+
     if (isSaving) {
       setSaveError('Sauvegarde en cours, veuillez patienter...');
       return;
