@@ -49,7 +49,7 @@ const auth = new GoogleAuth({
 console.log('Creating Google Sheets client...');
 export const sheets = google.sheets({ version: 'v4', auth });
 
-export const SPREADSHEET_ID = process.env.REACT_APP_GOOGLE_SHEETS_API_KEY;
+export const SPREADSHEET_ID = process.env.REACT_APP_SPREADSHEET_ID || process.env.REACT_APP_GOOGLE_SHEETS_API_KEY;
 console.log('Configuration complete:', {
   hasSpreadsheetId: !!SPREADSHEET_ID,
   spreadsheetId: SPREADSHEET_ID,
