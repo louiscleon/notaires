@@ -6,16 +6,37 @@ interface SheetData {
   villesInteret: VilleInteret[];
 }
 
+async function fetchWithCors(url: string, options?: RequestInit): Promise<Response> {
+  try {
+    const response = await fetch(url, {
+      ...options,
+      mode: 'cors',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response;
+  } catch (error) {
+    console.error('Fetch error:', error);
+    if (error instanceof TypeError && error.message.includes('CORS')) {
+      throw new Error('Erreur de connexion à l\'API. Veuillez vérifier que l\'API est bien déployée et accessible.');
+    }
+    throw error;
+  }
+}
+
 export const googleSheetsService = {
   async loadFromSheet(): Promise<SheetData> {
     try {
       console.log('Loading data from sheet');
-      const response = await fetch(`${API_BASE_URL}/sheets`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+      const response = await fetchWithCors(`${API_BASE_URL}/sheets`);
       const data = await response.json();
       console.log('API response:', data);
 
@@ -47,17 +68,10 @@ export const googleSheetsService = {
       const notaires = Array.isArray(notaire) ? notaire : [notaire];
       console.log('Saving notaires to sheet:', notaires.length);
 
-      const response = await fetch(`${API_BASE_URL}/sheets`, {
+      await fetchWithCors(`${API_BASE_URL}/sheets`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ notaires }),
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
 
       console.log('Save successful');
     } catch (error) {
@@ -70,17 +84,10 @@ export const googleSheetsService = {
     try {
       console.log('Saving villes interet:', villesInteret.length);
 
-      const response = await fetch(`${API_BASE_URL}/sheets/villes-interet`, {
+      await fetchWithCors(`${API_BASE_URL}/sheets/villes-interet`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ villesInteret }),
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
 
       console.log('Save successful');
     } catch (error) {
@@ -91,10 +98,7 @@ export const googleSheetsService = {
 
   async testConfig(): Promise<any> {
     try {
-      const response = await fetch(`${API_BASE_URL}/sheets/test`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      const response = await fetchWithCors(`${API_BASE_URL}/sheets/test`);
       return response.json();
     } catch (error) {
       console.error('Error testing config:', error);
