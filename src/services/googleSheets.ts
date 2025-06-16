@@ -111,11 +111,35 @@ export const googleSheetsService = {
       const notaires = Array.isArray(notaire) ? notaire : [notaire];
       console.log('Saving notaires to sheet:', notaires.length);
 
+      // Convertir les notaires en tableau de valeurs pour Google Sheets
+      const values = notaires.map(notaire => [
+        notaire.id,
+        notaire.officeNotarial,
+        notaire.adresse,
+        notaire.codePostal,
+        notaire.ville,
+        notaire.departement,
+        notaire.email,
+        notaire.notairesAssocies,
+        notaire.notairesSalaries,
+        notaire.nbAssocies,
+        notaire.nbSalaries,
+        notaire.serviceNego ? 'oui' : 'non',
+        notaire.statut,
+        notaire.notes,
+        JSON.stringify(notaire.contacts),
+        notaire.dateModification,
+        notaire.latitude,
+        notaire.longitude,
+        notaire.geoScore,
+        JSON.stringify(notaire.geocodingHistory)
+      ]);
+
       const response = await fetchWithCors(`${API_BASE_URL}/sheets`, {
         method: 'POST',
         body: JSON.stringify({ 
-          notaires,
-          range: SHEET_RANGES.NOTAIRES
+          range: SHEET_RANGES.NOTAIRES,
+          values
         }),
       });
 
