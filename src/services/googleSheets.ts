@@ -221,10 +221,16 @@ function parseNotaire(row: any[]): Notaire {
 
   // Fonction utilitaire pour parser les coordonnées
   const parseCoordinate = (value: any): number | undefined => {
-    const num = parseNumber(value);
-    if (num !== undefined && num >= -180 && num <= 180) {
+    if (value === undefined || value === null || value === '') {
+      return undefined;
+    }
+    // Remplacer la virgule par un point pour les nombres au format français
+    const cleanValue = String(value).trim().replace(/,/g, '.');
+    const num = Number(cleanValue);
+    if (!isNaN(num) && num >= -180 && num <= 180) {
       return num;
     }
+    console.warn('Coordonnée invalide:', value, '->', cleanValue, '->', num);
     return undefined;
   };
 
@@ -308,8 +314,8 @@ function parseNotaire(row: any[]): Notaire {
     dateContact: new Date().toISOString(), // Valeur par défaut
     dateRappel: new Date().toISOString(), // Valeur par défaut
     notes: notes || '',
-    latitude: parseCoordinate(latitude) || 0,
-    longitude: parseCoordinate(longitude) || 0,
+    latitude: parseCoordinate(latitude) ?? 0,
+    longitude: parseCoordinate(longitude) ?? 0,
     needsGeocoding: Boolean(shouldGeocode),
     nbAssocies: parseNumber(nbAssocies) || 0,
     nbSalaries: parseNumber(nbSalaries) || 0,
@@ -324,14 +330,17 @@ function parseNotaire(row: any[]): Notaire {
   };
 
   // Log des coordonnées pour debug
-  console.log('Notaire coordinates:', {
+  console.log('=== DEBUG COORDINATES PARSING ===');
+  console.log('Raw coordinates:', { latitude, longitude });
+  console.log('Parsed coordinates:', { 
+    latitude: notaire.latitude, 
+    longitude: notaire.longitude 
+  });
+  console.log('Notaire:', {
     id: notaire.id,
     office: notaire.officeNotarial,
-    rawLatitude: latitude,
-    rawLongitude: longitude,
-    parsedLatitude: notaire.latitude,
-    parsedLongitude: notaire.longitude,
-    needsGeocoding: notaire.needsGeocoding
+    needsGeocoding: notaire.needsGeocoding,
+    geoStatus: notaire.geoStatus
   });
 
   console.log('Parsed notaire:', notaire);
