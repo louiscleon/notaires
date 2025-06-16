@@ -253,13 +253,10 @@ const MapComponent: React.FC<Props> = ({
 
     // Si le géocodage initial n'a pas été fait et qu'il y a des notaires à géocoder
     if (!initialGeocodingDone.current && !geocodingRef.current) {
-      const notairesAGeocoder = filteredNotaires.filter(n => 
-        (!n.latitude || !n.longitude || n.needsGeocoding) &&
-        !updatedNotairesRef.current.has(n)
-      );
+      const notairesAGeocoder = filteredNotaires.filter(n => n.needsGeocoding);
 
       if (notairesAGeocoder.length > 0) {
-        console.log('Début du géocodage initial pour', notairesAGeocoder.length, 'notaires');
+        console.log('Début du géocodage pour', notairesAGeocoder.length, 'notaires');
         geocodingRef.current = true;
         setLoading(true);
 
@@ -283,16 +280,17 @@ const MapComponent: React.FC<Props> = ({
           // Appeler le callback de mise à jour
           onNotaireUpdate?.(updatedNotaire);
         }).then(() => {
-          console.log('Géocodage initial terminé');
+          console.log('Géocodage terminé');
           geocodingRef.current = false;
           setLoading(false);
           initialGeocodingDone.current = true;
         }).catch(error => {
-          console.error('Erreur lors du géocodage initial:', error);
+          console.error('Erreur lors du géocodage:', error);
           geocodingRef.current = false;
           setLoading(false);
         });
       } else {
+        console.log('Aucun notaire nécessite de géocodage');
         initialGeocodingDone.current = true;
       }
     }

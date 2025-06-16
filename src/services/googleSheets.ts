@@ -80,9 +80,16 @@ function parseNotaire(row: any[]): Notaire {
 
   console.log('Adresse complète:', adresseComplete);
   console.log('Adresse a changé:', adresseAChange);
+  console.log('Coordonnées existantes:', { latitude, longitude });
 
-  // Si l'adresse a changé, on réinitialise les coordonnées
-  const shouldResetCoordinates = adresseAChange;
+  // Déterminer si le géocodage est nécessaire
+  const shouldGeocode = !latitude || !longitude || adresseAChange;
+
+  console.log('Géocodage nécessaire:', shouldGeocode, {
+    pasDeLatitude: !latitude,
+    pasDeLongitude: !longitude,
+    adresseAChange
+  });
 
   // Fonction utilitaire pour parser les nombres
   const parseNumber = (value: any): number | undefined => {
@@ -166,9 +173,8 @@ function parseNotaire(row: any[]): Notaire {
     telephone: telephone || '',
     email: email || '',
     siteWeb: siteWeb || '',
-    // Si l'adresse a changé, on réinitialise les coordonnées
-    latitude: shouldResetCoordinates ? undefined : parseCoordinate(latitude),
-    longitude: shouldResetCoordinates ? undefined : parseCoordinate(longitude),
+    latitude: parseCoordinate(latitude),
+    longitude: parseCoordinate(longitude),
     statut: (() => {
       const normalizedStatut = String(statut || '').toLowerCase().trim();
       console.log('Normalizing statut:', { original: statut, normalized: normalizedStatut });
@@ -200,8 +206,7 @@ function parseNotaire(row: any[]): Notaire {
     notairesSalaries: notairesSalaries || '',
     geoScore: parseNumber(geoScore),
     geocodingHistory: geocodingHistory ? JSON.parse(geocodingHistory) : [],
-    // S'assurer que needsGeocoding est toujours un booléen
-    needsGeocoding: Boolean(needsGeocoding === 'true' || shouldResetCoordinates)
+    needsGeocoding: Boolean(shouldGeocode)
   };
 
   // Log des coordonnées pour debug
