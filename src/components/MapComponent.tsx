@@ -232,11 +232,6 @@ const MapComponent: React.FC<Props> = ({
     const notairesMap = new Map(filteredNotaires.map(n => [n.id, n]));
     notairesRef.current = notairesMap;
 
-    console.log('=== DEBUG MAP COMPONENT ===');
-    console.log('Total notaires reçus:', filteredNotaires.length);
-    console.log('Notaires avec coordonnées:', filteredNotaires.filter(n => n.latitude && n.longitude).length);
-    console.log('Notaires sans coordonnées:', filteredNotaires.filter(n => !n.latitude || !n.longitude).length);
-
     // Filtrer les notaires qui ont déjà des coordonnées valides
     let notairesValides = filteredNotaires.filter(n =>
       typeof n.latitude === 'number' &&
@@ -244,8 +239,6 @@ const MapComponent: React.FC<Props> = ({
       !isNaN(n.latitude) &&
       !isNaN(n.longitude)
     );
-    
-    console.log('Notaires valides après filtrage:', notairesValides.length);
     
     // Mettre à jour les notaires avec coordonnées
     setNotairesAvecCoordonnees(notairesValides);
@@ -259,7 +252,6 @@ const MapComponent: React.FC<Props> = ({
       );
 
       if (notairesAGeocoder.length > 0) {
-        console.log('Début du géocodage pour', notairesAGeocoder.length, 'notaires');
         geocodingRef.current = true;
         setLoading(true);
 
@@ -283,17 +275,14 @@ const MapComponent: React.FC<Props> = ({
           // Appeler le callback de mise à jour
           onNotaireUpdate?.(updatedNotaire);
         }).then(() => {
-          console.log('Géocodage terminé');
           geocodingRef.current = false;
           setLoading(false);
           initialGeocodingDone.current = true;
         }).catch(error => {
-          console.error('Erreur lors du géocodage:', error);
           geocodingRef.current = false;
           setLoading(false);
         });
       } else {
-        console.log('Aucun notaire nécessite de géocodage');
         initialGeocodingDone.current = true;
       }
     }
@@ -304,21 +293,6 @@ const MapComponent: React.FC<Props> = ({
     if (!showOnlyInRadius) return notairesAvecCoordonnees;
     return notairesAvecCoordonnees.filter(notaire => isNotaireInRadius(notaire, villesInteret));
   }, [notairesAvecCoordonnees, showOnlyInRadius, villesInteret, isNotaireInRadius]);
-
-  // Log temporaire pour debug
-  useEffect(() => {
-    notairesAvecCoordonnees.forEach(n => {
-      console.log(`[DEBUG] Notaire: ${n.officeNotarial}, lat: ${n.latitude}, lon: ${n.longitude}`);
-    });
-  }, [notairesAvecCoordonnees]);
-
-  // Log temporaire pour debug villes d'intérêt
-  useEffect(() => {
-    console.log('[DEBUG] Villes d\'intérêt reçues:', villesInteret);
-    villesInteret.forEach(v => {
-      console.log(`[DEBUG] Ville: ${v.nom}, lat: ${v.latitude}, lon: ${v.longitude}, rayon: ${v.rayon}`);
-    });
-  }, [villesInteret]);
 
   return (
     <div className="space-y-4">

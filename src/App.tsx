@@ -391,13 +391,18 @@ const App: React.FC = () => {
               </div>
               <div className="bg-white rounded-lg shadow-lg overflow-hidden">
                 <div className="h-[calc(100vh-16rem)] md:h-[600px] lg:h-[600px]">
-                  <MapComponent
-                    notaires={notairesFiltres}
-                    villesInteret={filtres.villesInteret}
-                    onNotaireClick={handleNotaireClick}
-                    onNotaireUpdate={handleNotaireUpdate}
-                    showOnlyInRadius={filtres.showOnlyInRadius}
-                  />
+                  {(() => {
+                    console.log('[DEBUG] filtres.villesInteret juste avant MapComponent:', filtres.villesInteret);
+                    return (
+                      <MapComponent
+                        notaires={notairesFiltres}
+                        villesInteret={filtres.villesInteret}
+                        onNotaireClick={handleNotaireClick}
+                        onNotaireUpdate={handleNotaireUpdate}
+                        showOnlyInRadius={filtres.showOnlyInRadius}
+                      />
+                    );
+                  })()}
                 </div>
               </div>
             </div>
