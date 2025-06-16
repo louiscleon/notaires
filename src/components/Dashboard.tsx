@@ -46,13 +46,13 @@ const Dashboard: React.FC<Props> = ({ notaires, onNotaireClick }) => {
     },
     {
       title: 'À envisager',
-      value: notaires.filter(n => n.statut === 'a_envisager').length,
+      value: notaires.filter(n => n.statut === 'envisage').length,
       description: 'Études à étudier',
       color: 'bg-blue-50'
     },
     {
       title: 'Contactés',
-      value: notaires.filter(n => n.statut === 'contacte').length,
+      value: notaires.filter(n => n.contacts?.length > 0).length,
       description: 'Études déjà contactées',
       color: 'bg-purple-50'
     }
@@ -180,17 +180,17 @@ const Dashboard: React.FC<Props> = ({ notaires, onNotaireClick }) => {
                   </div>
                 </div>
                 <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  dernierContact.reponseRecue
-                    ? dernierContact.reponseRecue.positive
+                  !dernierContact.reponseRecue
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : dernierContact.reponseRecue.positive
                       ? 'bg-green-100 text-green-800'
                       : 'bg-red-100 text-red-800'
-                    : 'bg-yellow-100 text-yellow-800'
                 }`}>
-                  {dernierContact.reponseRecue
-                    ? dernierContact.reponseRecue.positive
+                  {!dernierContact.reponseRecue
+                    ? 'En attente'
+                    : dernierContact.reponseRecue.positive
                       ? 'Réponse positive'
-                      : 'Réponse négative'
-                    : 'En attente'}
+                      : 'Réponse négative'}
                 </div>
               </button>
             );
