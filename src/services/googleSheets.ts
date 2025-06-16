@@ -169,7 +169,27 @@ function parseNotaire(row: any[]): Notaire {
     // Si l'adresse a changé, on réinitialise les coordonnées
     latitude: shouldResetCoordinates ? undefined : parseCoordinate(latitude),
     longitude: shouldResetCoordinates ? undefined : parseCoordinate(longitude),
-    statut: statut || 'nouveau',
+    statut: (() => {
+      const normalizedStatut = String(statut || '').toLowerCase().trim();
+      console.log('Normalizing statut:', { original: statut, normalized: normalizedStatut });
+      
+      // Mapping des valeurs possibles vers les statuts valides
+      const statutMap: { [key: string]: NotaireStatut } = {
+        'favori': 'favori',
+        'favoris': 'favori',
+        'envisage': 'envisage',
+        'à envisager': 'envisage',
+        'a envisager': 'envisage',
+        'non interesse': 'non_interesse',
+        'non intéresse': 'non_interesse',
+        'non_interesse': 'non_interesse',
+        'non défini': 'non_defini',
+        'non defini': 'non_defini',
+        'non_defini': 'non_defini'
+      };
+
+      return statutMap[normalizedStatut] || 'non_defini';
+    })(),
     notes: notes || '',
     contacts: parseContacts(contacts),
     dateModification: parseDate(dateModification),
@@ -180,8 +200,8 @@ function parseNotaire(row: any[]): Notaire {
     notairesSalaries: notairesSalaries || '',
     geoScore: parseNumber(geoScore),
     geocodingHistory: geocodingHistory ? JSON.parse(geocodingHistory) : [],
-    // Utiliser la valeur stockée ou déterminer si le géocodage est nécessaire
-    needsGeocoding: needsGeocoding === 'true' || shouldResetCoordinates
+    // S'assurer que needsGeocoding est toujours un booléen
+    needsGeocoding: Boolean(needsGeocoding === 'true' || shouldResetCoordinates)
   };
 
   // Log des coordonnées pour debug

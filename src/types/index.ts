@@ -33,29 +33,35 @@ export interface GeocodingHistory {
 export interface Notaire {
   id: string;
   officeNotarial: string;
+  departement: string;
+  nom: string;
+  prenom: string;
   adresse: string;
   codePostal: string;
   ville: string;
-  departement: string;
-  telephone?: string;
-  email?: string;
-  siteWeb?: string;
-  latitude?: number;
-  longitude?: number;
+  telephone: string;
+  email: string;
+  siteWeb: string;
   statut: NotaireStatut;
-  contacts: Contact[];
-  dateModification?: string;
-  notes?: string;
+  dateContact: string;
+  dateRappel: string;
+  notes: string;
+  latitude: number;
+  longitude: number;
+  needsGeocoding: boolean;
+  distance?: number;
+  score?: number;
   nbAssocies: number;
   nbSalaries: number;
-  notairesAssocies?: string;
-  notairesSalaries?: string;
-  serviceNego: boolean;
-  geoScore?: number;
-  geoStatus?: 'pending' | 'success' | 'error';
+  contacts: Contact[];
+  dateModification?: string;
   display_name?: string;
   geocodingHistory?: GeocodingHistory[];
-  needsGeocoding?: boolean;
+  serviceNego: boolean;
+  notairesAssocies: string;
+  notairesSalaries: string;
+  geoScore?: number;
+  geoStatus?: 'pending' | 'success' | 'error';
 }
 
 export interface VilleInteret {
