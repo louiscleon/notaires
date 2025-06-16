@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Notaire, NotaireStatut, Contact, ContactStatut, AdresseSuggestion } from '../types';
 import { searchAdresse } from '../services/adresse';
 import { geocodeAddress } from '../services/geocoding';
+import { googleSheetsService } from '../services/googleSheets';
 
 interface NotaireDetailProps {
   notaire: Notaire;
@@ -98,7 +99,11 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
           latitude: result.lat,
           longitude: result.lon,
           display_name: result.display_name,
+          dateModification: new Date().toISOString()
         };
+        
+        // Sauvegarder dans Google Sheets
+        await googleSheetsService.saveToSheet(updatedNotaire);
         
         onUpdate(updatedNotaire);
         setGeocodingStatus('Géocodage réussi !');
@@ -108,8 +113,20 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
         return;
       }
     } else {
-      onUpdate(editedNotaire);
-      setIsEditing(false);
+      // Sauvegarder dans Google Sheets même si pas de changement d'adresse
+      const updatedNotaire = {
+        ...editedNotaire,
+        dateModification: new Date().toISOString()
+      };
+      
+      try {
+        await googleSheetsService.saveToSheet(updatedNotaire);
+        onUpdate(updatedNotaire);
+        setIsEditing(false);
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde:', error);
+        setGeocodingStatus('Erreur lors de la sauvegarde');
+      }
     }
   };
 
@@ -143,13 +160,22 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
       contacts: [...notaire.contacts, contact],
       dateModification: new Date().toISOString()
     };
-    onUpdate(updatedNotaire);
-    setShowContactForm(false);
-    setNewContact({
-      type: 'initial',
-      par: 'Fanny',
-      statut: 'mail_envoye'
-    });
+
+    // Sauvegarder dans Google Sheets
+    googleSheetsService.saveToSheet(updatedNotaire)
+      .then(() => {
+        onUpdate(updatedNotaire);
+        setShowContactForm(false);
+        setNewContact({
+          type: 'initial',
+          par: 'Fanny',
+          statut: 'mail_envoye'
+        });
+      })
+      .catch(error => {
+        console.error('Erreur lors de la sauvegarde du contact:', error);
+        setGeocodingStatus('Erreur lors de la sauvegarde du contact');
+      });
   };
 
   const handleUpdateContact = (index: number, updates: Partial<Contact>) => {
@@ -173,11 +199,21 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
 
     updatedContacts[index] = { ...currentContact, ...updates };
 
-    onUpdate({
+    const updatedNotaire = {
       ...notaire,
       contacts: updatedContacts,
       dateModification: new Date().toISOString()
-    });
+    };
+
+    // Sauvegarder dans Google Sheets
+    googleSheetsService.saveToSheet(updatedNotaire)
+      .then(() => {
+        onUpdate(updatedNotaire);
+      })
+      .catch(error => {
+        console.error('Erreur lors de la mise à jour du contact:', error);
+        setGeocodingStatus('Erreur lors de la mise à jour du contact');
+      });
   };
 
   if (!isOpen) return null;
