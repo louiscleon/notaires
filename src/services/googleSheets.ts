@@ -21,6 +21,7 @@ async function fetchWithCors(url: string, options?: RequestInit): Promise<Respon
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         ...options?.headers,
       },
     });
@@ -33,6 +34,12 @@ async function fetchWithCors(url: string, options?: RequestInit): Promise<Respon
         headers: Object.fromEntries(response.headers.entries()),
         body: errorText
       });
+      
+      // Check if the response is HTML instead of JSON
+      if (errorText.trim().startsWith('<!DOCTYPE html>')) {
+        throw new Error('Received HTML response instead of JSON. The API endpoint might be incorrect or the server might be down.');
+      }
+      
       throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
     }
 
