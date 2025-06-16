@@ -142,21 +142,36 @@ export class GeocodingService {
   }
 
   async geocodeNotaire(notaire: Notaire): Promise<GeocodingResult> {
-    // Construire l'adresse à géocoder uniquement avec les parties non vides
-    const addressParts = [notaire.adresse, notaire.codePostal, notaire.ville]
-      .filter(part => part && String(part).trim().length > 0)
-      .join(' ')
-      .trim();
-    return this.geocodeAddress(addressParts);
+    // Construire l'adresse à géocoder
+    let addressToGeocode = '';
+    
+    // Si nous avons une adresse complète, l'utiliser
+    if (notaire.adresse && notaire.adresse.trim().length > 0) {
+      addressToGeocode = `${notaire.adresse}, ${notaire.codePostal} ${notaire.ville}`;
+    } else {
+      // Sinon, utiliser le code postal et la ville
+      addressToGeocode = `${notaire.codePostal} ${notaire.ville}`;
+    }
+
+    // Nettoyer l'adresse
+    addressToGeocode = addressToGeocode.trim().replace(/\s+/g, ' ');
+    
+    console.log('Adresse à géocoder:', addressToGeocode);
+    return this.geocodeAddress(addressToGeocode);
   }
 
   async geocodeSingleNotaire(notaire: Notaire): Promise<Notaire> {
     const result = await this.geocodeNotaire(notaire);
     const now = new Date().toISOString();
 
+    // Construire l'adresse complète pour l'historique
+    const fullAddress = notaire.adresse 
+      ? `${notaire.adresse}, ${notaire.codePostal} ${notaire.ville}`
+      : `${notaire.codePostal} ${notaire.ville}`;
+
     const history: GeocodingHistory = {
       date: now,
-      address: `${notaire.adresse}, ${notaire.codePostal} ${notaire.ville}`,
+      address: fullAddress,
       success: !result.error,
       coordinates: result.error ? undefined : { lat: result.lat, lon: result.lon }
     };

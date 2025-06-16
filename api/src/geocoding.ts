@@ -33,7 +33,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('Geocoding address:', address);
 
     try {
-      const response = await axios.get(GEOCODING_API_URL, {
+      // Essayer d'abord avec le type housenumber
+      let response = await axios.get(GEOCODING_API_URL, {
         params: {
           q: address,
           limit: 1,
@@ -44,12 +45,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           'Accept': 'application/json',
           'User-Agent': 'NotairesApp/1.0'
         },
-        timeout: 30000 // 30 secondes
+        timeout: 30000
       });
 
-      console.log('Geocoding API response:', response.data);
+      console.log('Initial geocoding response:', response.data);
+
+      // Si pas de résultat avec housenumber, essayer avec municipality
+      if (!response.data.features || response.data.features.length === 0) {
+        console.log('No housenumber found, trying municipality...');
+        response = await axios.get(GEOCODING_API_URL, {
+          params: {
+            q: address,
+            limit: 1,
+            type: 'municipality',
+            autocomplete: 0
+          },
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'NotairesApp/1.0'
+          },
+          timeout: 30000
+        });
+        console.log('Municipality geocoding response:', response.data);
+      }
 
       if (!response.data.features || response.data.features.length === 0) {
+        console.log('No results found for address:', address);
         return res.status(200).json({
           lat: 0,
           lon: 0,
@@ -62,6 +83,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const feature = response.data.features[0];
       const [lon, lat] = feature.geometry.coordinates;
       const score = feature.properties.score;
+
+      console.log('Geocoding result:', {
+        address,
+        lat,
+        lon,
+        score,
+        label: feature.properties.label,
+        type: feature.properties.type
+      });
 
       return res.status(200).json({
         lat,
