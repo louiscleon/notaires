@@ -312,6 +312,14 @@ const MapComponent: React.FC<Props> = ({
     });
   }, [notairesAvecCoordonnees]);
 
+  // Log temporaire pour debug villes d'intérêt
+  useEffect(() => {
+    console.log('[DEBUG] Villes d\'intérêt reçues:', villesInteret);
+    villesInteret.forEach(v => {
+      console.log(`[DEBUG] Ville: ${v.nom}, lat: ${v.latitude}, lon: ${v.longitude}, rayon: ${v.rayon}`);
+    });
+  }, [villesInteret]);
+
   return (
     <div className="space-y-4">
       <SearchBar
