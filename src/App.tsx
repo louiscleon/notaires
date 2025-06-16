@@ -273,7 +273,12 @@ const App: React.FC = () => {
     setSelectedNotaire(notaire);
   };
 
-  const handleCloseModal = () => {
+  const handleCloseModal = async () => {
+    // Si nous sommes en train d'éditer, on ne ferme pas directement
+    if (isEditing) {
+      setIsEditing(false);
+      return;
+    }
     setSelectedNotaire(null);
   };
 
@@ -292,9 +297,11 @@ const App: React.FC = () => {
       }
 
       addToast('Modifications sauvegardées avec succès', 'success');
+      return true; // Indiquer que la sauvegarde a réussi
     } catch (error) {
       console.error('Erreur lors de la mise à jour du notaire:', error);
       addToast('Erreur lors de la mise à jour du notaire', 'error');
+      return false; // Indiquer que la sauvegarde a échoué
     }
   };
 

@@ -129,10 +129,23 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     return () => clearTimeout(timeoutId);
   }, [editedNotaire.adresse]);
 
+  const handleClose = async () => {
+    // Sauvegarder les modifications en cours avant de fermer
+    if (editedNotaire !== notaire) {
+      try {
+        await saveAndSync(editedNotaire);
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde finale:', error);
+        // Ne pas fermer si la sauvegarde échoue
+        return;
+      }
+    }
+    onClose();
+  };
+
   const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
-    // S'assurer que l'ID est toujours présent
     if (!editedNotaire.id) {
       console.error('ID du notaire manquant');
       setSaveError('Erreur : ID du notaire manquant');
@@ -142,7 +155,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     const updatedNotaire = {
       ...editedNotaire,
       [name]: value,
-      id: editedNotaire.id, // Forcer l'ID à être conservé
+      id: editedNotaire.id,
       dateModification: new Date().toISOString()
     };
     setEditedNotaire(updatedNotaire);
@@ -155,7 +168,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     // Créer un nouveau timeout pour sauvegarder
     saveTimeoutRef.current = setTimeout(async () => {
       await saveAndSync(updatedNotaire);
-    }, 1000); // Augmenter le délai à 1 seconde pour réduire le nombre de requêtes
+    }, 1000);
 
     if (name === 'adresse') {
       setShowSuggestions(true);
@@ -235,9 +248,12 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     try {
       setSaveError(null);
       await onSave(updatedNotaire);
+      // Mettre à jour l'état local après une sauvegarde réussie
+      setEditedNotaire(updatedNotaire);
     } catch (error) {
       console.error('Erreur lors de la synchronisation avec Google Sheets:', error);
       setSaveError('Erreur lors de la sauvegarde. Les modifications seront perdues au rechargement de la page.');
+      throw error; // Propager l'erreur pour que le composant parent puisse la gérer
     }
   };
 
@@ -257,7 +273,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
+      <Dialog as="div" className="relative z-50" onClose={handleClose}>
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-300"
@@ -288,7 +304,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                       {notaire.officeNotarial}
                     </Dialog.Title>
                     <button
-                      onClick={onClose}
+                      onClick={handleClose}
                       className="text-white hover:text-gray-200 transition-colors duration-200"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
