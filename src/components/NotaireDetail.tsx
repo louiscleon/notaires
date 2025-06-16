@@ -217,7 +217,13 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
   const handleClose = async () => {
     // Sauvegarder les modifications non enregistrées avant de fermer
     if (hasUnsavedChanges.current) {
-      await saveAndSync(editedNotaire);
+      try {
+        await saveAndSync(editedNotaire);
+        // Attendre que la sauvegarde soit terminée avant de fermer
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde finale:', error);
+      }
     }
     onClose();
   };
