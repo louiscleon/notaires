@@ -179,7 +179,11 @@ const App: React.FC = () => {
   };
 
   const notairesFiltres = useMemo(() => {
-    return notaires.filter((notaire: Notaire) => {
+    console.log('=== DEBUG APP COMPONENT ===');
+    console.log('Total notaires before filtering:', notaires.length);
+    console.log('Filtres actuels:', filtres);
+
+    const filtered = notaires.filter((notaire: Notaire) => {
       // Filtre par type de notaire
       if (filtres.typeNotaire !== 'tous') {
         const estGroupe = notaire.nbAssocies > 1;
@@ -218,11 +222,17 @@ const App: React.FC = () => {
       // Filtre par rayon des villes d'intérêt
       if (filtres.showOnlyInRadius && filtres.villesInteret.length > 0) {
         // Vérifier si le notaire a des coordonnées
-        if (!notaire.latitude || !notaire.longitude) return false;
+        if (!notaire.latitude || !notaire.longitude) {
+          console.log('Notaire sans coordonnées:', notaire.officeNotarial);
+          return false;
+        }
 
         // Vérifier si le notaire est dans le rayon d'au moins une ville d'intérêt
         const estDansRayon = filtres.villesInteret.some(ville => {
-          if (!ville.latitude || !ville.longitude) return false;
+          if (!ville.latitude || !ville.longitude) {
+            console.log('Ville sans coordonnées:', ville.nom);
+            return false;
+          }
           
           // On est sûr que les coordonnées existent à ce stade
           const notaireLat = notaire.latitude as number;
@@ -244,11 +254,18 @@ const App: React.FC = () => {
           return distance <= ville.rayon;
         });
 
-        if (!estDansRayon) return false;
+        if (!estDansRayon) {
+          console.log('Notaire hors rayon:', notaire.officeNotarial);
+          return false;
+        }
       }
 
       return true;
     });
+
+    console.log('Notaires après filtrage:', filtered.length);
+    console.log('Exemple de notaire filtré:', filtered[0]);
+    return filtered;
   }, [notaires, filtres]);
 
   const handleNotaireClick = (notaire: Notaire) => {

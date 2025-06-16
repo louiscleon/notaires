@@ -69,13 +69,23 @@ async function parseJsonResponse(response: Response): Promise<any> {
 export const googleSheetsService = {
   async loadFromSheet(): Promise<SheetData> {
     try {
-      console.log('Loading data from sheet');
+      console.log('=== DEBUG LOAD FROM SHEET ===');
+      console.log('API URL:', `${API_BASE_URL}/sheets?range=${SHEET_RANGES.NOTAIRES}`);
+      
       const response = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.NOTAIRES}`);
+      console.log('API Response status:', response.status);
+      
       const data = await parseJsonResponse(response);
       console.log('Raw sheet data:', data);
 
       if (!Array.isArray(data)) {
+        console.error('Invalid API response format:', data);
         throw new Error('Invalid API response format: expected array of rows');
+      }
+
+      console.log('Number of rows received:', data.length);
+      if (data.length > 0) {
+        console.log('First row sample:', data[0]);
       }
 
       // Convertir les lignes brutes en objets Notaire
@@ -83,17 +93,11 @@ export const googleSheetsService = {
       const villesInteret: VilleInteret[] = []; // Pour l'instant, nous ne chargeons pas les villes d'intérêt
 
       // Vérifier les données des notaires
-      console.log('Checking notaires data:', {
-        total: notaires.length,
-        withStatus: notaires.filter(n => n.statut).length,
-        statuses: notaires.reduce((acc, n) => {
-          acc[n.statut] = (acc[n.statut] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>)
-      });
-
-      console.log('Parsed notaires:', notaires.length);
-      console.log('Parsed villes interet:', villesInteret.length);
+      console.log('=== NOTAIRES DATA SUMMARY ===');
+      console.log('Total notaires:', notaires.length);
+      console.log('Notaires with coordinates:', notaires.filter(n => n.latitude !== 0 && n.longitude !== 0).length);
+      console.log('Notaires without coordinates:', notaires.filter(n => n.latitude === 0 || n.longitude === 0).length);
+      console.log('Sample notaire:', notaires[0]);
 
       return { notaires, villesInteret };
     } catch (error) {
