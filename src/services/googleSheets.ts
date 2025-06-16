@@ -50,18 +50,20 @@ function parseNotaire(row: any[]): Notaire {
     codePostal,
     ville,
     departement,
+    telephone,
     email,
-    notairesAssocies,
-    notairesSalaries,
-    nbAssocies,
-    nbSalaries,
-    serviceNego,
+    siteWeb,
+    latitude,
+    longitude,
     statut,
     notes,
     contacts,
     dateModification,
-    latitude,
-    longitude,
+    nbAssocies,
+    nbSalaries,
+    serviceNego,
+    notairesAssocies,
+    notairesSalaries,
     geoScore,
     geocodingHistory
   ] = row;
@@ -73,22 +75,24 @@ function parseNotaire(row: any[]): Notaire {
     codePostal: codePostal || '',
     ville: ville || '',
     departement: departement || '',
+    telephone: telephone || '',
     email: email || '',
-    notairesAssocies: notairesAssocies || '',
-    notairesSalaries: notairesSalaries || '',
-    nbAssocies: parseInt(nbAssocies) || 0,
-    nbSalaries: parseInt(nbSalaries) || 0,
-    serviceNego: serviceNego === 'oui',
-    statut: statut || 'nouveau',
-    notes: notes || '',
-    contacts: contacts ? JSON.parse(contacts) : [],
-    dateModification: dateModification || new Date().toISOString(),
+    siteWeb: siteWeb || '',
     latitude: latitude !== undefined && latitude !== null && latitude !== '' && !isNaN(Number(String(latitude).trim().replace(/,/g, '.')))
       ? Number(String(latitude).trim().replace(/,/g, '.'))
       : undefined,
     longitude: longitude !== undefined && longitude !== null && longitude !== '' && !isNaN(Number(String(longitude).trim().replace(/,/g, '.')))
       ? Number(String(longitude).trim().replace(/,/g, '.'))
       : undefined,
+    statut: statut || 'nouveau',
+    notes: notes || '',
+    contacts: contacts ? JSON.parse(contacts) : [],
+    dateModification: dateModification || new Date().toISOString(),
+    nbAssocies: parseInt(nbAssocies) || 0,
+    nbSalaries: parseInt(nbSalaries) || 0,
+    serviceNego: serviceNego === 'oui',
+    notairesAssocies: notairesAssocies || '',
+    notairesSalaries: notairesSalaries || '',
     geoScore: geoScore ? parseFloat(geoScore) : undefined,
     geocodingHistory: geocodingHistory ? JSON.parse(geocodingHistory) : []
   };
@@ -103,8 +107,12 @@ function parseVilleInteret(row: any[]): VilleInteret {
     id: id || `ville_${Date.now()}`,
     nom: nom || '',
     rayon: parseFloat(rayon) || 15,
-    latitude: parseFloat(latitude) || 0,
-    longitude: parseFloat(longitude) || 0,
+    latitude: latitude !== undefined && latitude !== null && latitude !== '' && !isNaN(Number(String(latitude).trim().replace(/,/g, '.')))
+      ? Number(String(latitude).trim().replace(/,/g, '.'))
+      : 0,
+    longitude: longitude !== undefined && longitude !== null && longitude !== '' && !isNaN(Number(String(longitude).trim().replace(/,/g, '.')))
+      ? Number(String(longitude).trim().replace(/,/g, '.'))
+      : 0,
     departement: departement || '',
     population: population ? parseInt(population) : undefined
   };
