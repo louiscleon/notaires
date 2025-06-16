@@ -15,7 +15,8 @@ export class GeocodingService {
   private readonly CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 jours
   private readonly MAX_RETRIES = 3;
   private readonly RETRY_DELAY = 2000; // 2 secondes
-  private readonly REQUEST_TIMEOUT = 10000; // 10 secondes
+  private readonly REQUEST_TIMEOUT = 30000; // 30 secondes
+  public readonly REQUEST_DELAY = 1000; // 1 seconde entre les requêtes
 
   constructor() {
     this.loadCache();
@@ -62,9 +63,16 @@ export class GeocodingService {
       return await fn();
     } catch (error) {
       if (retries > 0) {
-        console.log(`Tentative échouée, nouvelle tentative dans ${this.RETRY_DELAY}ms... (${retries} restantes)`);
-        await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY));
-        return this.retryWithDelay(fn, retries - 1);
+        const isNetworkError = error instanceof Error && 
+          (error.message.includes('Network Error') || 
+           error.message.includes('timeout') ||
+           error.message.includes('ECONNABORTED'));
+        
+        if (isNetworkError) {
+          console.log(`Erreur réseau détectée, nouvelle tentative dans ${this.RETRY_DELAY}ms... (${retries} restantes)`);
+          await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY));
+          return this.retryWithDelay(fn, retries - 1);
+        }
       }
       throw error;
     }
@@ -84,7 +92,13 @@ export class GeocodingService {
       const response = await this.retryWithDelay(() => 
         axios.get(
           `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(address)}&limit=1&type=housenumber&autocomplete=0`,
-          { timeout: this.REQUEST_TIMEOUT }
+          { 
+            timeout: this.REQUEST_TIMEOUT,
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'NotairesApp/1.0'
+            }
+          }
         )
       );
 
@@ -201,9 +215,17 @@ export const geocodeBatch = async (
   onNotaireGeocoded?: (notaire: Notaire) => void
 ): Promise<Notaire[]> => {
   const results: Notaire[] = [];
+  const geocodingService = new GeocodingService();
   
   for (const notaire of notaires) {
     try {
+      // Vérifier si le notaire a déjà des coordonnées valides
+      if (notaire.latitude && notaire.longitude && !notaire.needsGeocoding) {
+        console.log(`Notaire ${notaire.id} a déjà des coordonnées valides, skip du géocodage`);
+        results.push(notaire);
+        continue;
+      }
+
       const updatedNotaire = await geocodingService.geocodeSingleNotaire(notaire);
       results.push(updatedNotaire);
       
@@ -211,11 +233,24 @@ export const geocodeBatch = async (
         onNotaireGeocoded(updatedNotaire);
       }
       
-      // Augmenter le délai entre les requêtes pour éviter de surcharger l'API
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Augmenter le délai entre les requêtes
+      await new Promise(resolve => setTimeout(resolve, geocodingService.REQUEST_DELAY));
     } catch (error) {
       console.error(`Erreur lors du géocodage du notaire ${notaire.id}:`, error);
-      results.push(notaire);
+      // En cas d'erreur, conserver les coordonnées existantes si elles existent
+      results.push({
+        ...notaire,
+        geoStatus: 'error',
+        geocodingHistory: [
+          ...(notaire.geocodingHistory || []),
+          {
+            date: new Date().toISOString(),
+            address: `${notaire.adresse}, ${notaire.codePostal} ${notaire.ville}`,
+            success: false,
+            coordinates: undefined
+          }
+        ]
+      });
     }
   }
   
