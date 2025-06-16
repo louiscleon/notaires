@@ -12,6 +12,7 @@ import { googleSheetsService } from './services/googleSheets';
 import Toast from './components/Toast';
 import { geocodeAddress } from './services/geocoding';
 import Logo from './components/Logo';
+import NotaireDetail from './components/NotaireDetail';
 
 interface ToastMessage {
   message: string;
@@ -276,10 +277,28 @@ const App: React.FC = () => {
     setSelectedNotaire(null);
   };
 
-  const handleNotaireUpdate = (updatedNotaire: Notaire) => {
-    const newNotaires = notaires.map(n => n.id === updatedNotaire.id ? updatedNotaire : n);
-    setNotaires(newNotaires);
-    // La synchronisation sera faite automatiquement par le composant qui a fait la mise à jour
+  const handleNotaireUpdate = async (updatedNotaire: Notaire) => {
+    try {
+      // Sauvegarder dans Google Sheets
+      await googleSheetsService.saveToSheet(updatedNotaire);
+      
+      // Recharger les données depuis Google Sheets
+      const { notaires: updatedNotaires } = await googleSheetsService.loadFromSheet();
+      
+      // Mettre à jour l'état avec les données fraîches
+      setNotaires(updatedNotaires);
+      
+      // Mettre à jour le notaire sélectionné si c'est celui qui a été modifié
+      if (selectedNotaire && selectedNotaire.id === updatedNotaire.id) {
+        const freshNotaire = updatedNotaires.find(n => n.id === updatedNotaire.id);
+        if (freshNotaire) {
+          setSelectedNotaire(freshNotaire);
+        }
+      }
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du notaire:', error);
+      addToast('Erreur lors de la mise à jour du notaire', 'error');
+    }
   };
 
   const handleFiltresChange = (newFiltres: Filtres) => {
@@ -435,13 +454,11 @@ const App: React.FC = () => {
       {selectedNotaire && (
         <div className="fixed inset-0 z-[60] overflow-y-auto">
           <div className="flex min-h-screen items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <NotaireModal
-              isOpen={true}
+            <NotaireDetail
               notaire={selectedNotaire}
-              onClose={handleCloseModal}
-              onSave={handleNotaireUpdate}
-              isEditing={isEditing}
-              setIsEditing={setIsEditing}
+              isOpen={!!selectedNotaire}
+              onClose={() => setSelectedNotaire(null)}
+              onUpdate={handleNotaireUpdate}
             />
           </div>
         </div>

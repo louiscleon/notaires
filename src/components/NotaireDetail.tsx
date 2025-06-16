@@ -57,6 +57,14 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
   });
 
   useEffect(() => {
+    setEditedNotaire(notaire);
+    setAdresse(notaire.adresse);
+    setEmail(notaire.email);
+    setNotes(notaire.notes || '');
+    setStatut(notaire.statut);
+  }, [notaire]);
+
+  useEffect(() => {
     const searchAdresses = async () => {
       if (adresse.length < 3) {
         setAdresseSuggestions([]);
