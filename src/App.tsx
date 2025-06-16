@@ -392,7 +392,12 @@ const App: React.FC = () => {
               <div className="bg-white rounded-lg shadow-lg overflow-hidden">
                 <div className="h-[calc(100vh-16rem)] md:h-[600px] lg:h-[600px]">
                   {(() => {
-                    console.log('[DEBUG] filtres.villesInteret juste avant MapComponent:', filtres.villesInteret);
+                    if (filtres.villesInteret && filtres.villesInteret.length > 0) {
+                      const v = filtres.villesInteret[0];
+                      console.log(`[DEBUG] Première ville d'intérêt: ${v.nom}, lat: ${v.latitude}, lon: ${v.longitude}`);
+                    } else {
+                      console.log('[DEBUG] Aucune ville d\'intérêt dans filtres.villesInteret');
+                    }
                     return (
                       <MapComponent
                         notaires={notairesFiltres}

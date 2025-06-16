@@ -82,18 +82,11 @@ export class GeocodingService {
     const cacheKey = this.getCacheKey(address);
     const cached = this.cache[cacheKey];
 
-    console.log('=== DEBUG GEOCODING SERVICE ===');
-    console.log('Adresse à géocoder:', address);
-    console.log('Cache key:', cacheKey);
-    console.log('Cache hit:', !!cached);
-
     if (cached && this.isCacheValid(cached.timestamp)) {
-      console.log('Utilisation du cache pour:', address);
       return cached.result;
     }
 
     try {
-      console.log('Appel API de géocodage pour:', address);
       const response = await this.retryWithDelay(() => 
         axios.get(
           `/api/geocoding?address=${encodeURIComponent(address)}`,
@@ -106,10 +99,7 @@ export class GeocodingService {
         )
       );
 
-      console.log('Réponse de l\'API de géocodage:', response.data);
-
       if (response.data.error) {
-        console.warn('Erreur de géocodage:', response.data.error);
         return {
           lat: 0,
           lon: 0,
@@ -135,7 +125,6 @@ export class GeocodingService {
 
       return result;
     } catch (error) {
-      console.error('Erreur de géocodage:', error);
       return {
         lat: 0,
         lon: 0,
@@ -161,7 +150,6 @@ export class GeocodingService {
     // Nettoyer l'adresse
     addressToGeocode = addressToGeocode.trim().replace(/\s+/g, ' ');
     
-    console.log('Adresse à géocoder:', addressToGeocode);
     return this.geocodeAddress(addressToGeocode);
   }
 
