@@ -1,47 +1,107 @@
-import { NotaireStatut, Contact, GeocodingHistory } from '../types';
+import { API_BASE_URL } from '../config';
+import type { Notaire, VilleInteret, Contact, NotaireStatut } from '../types';
 
 interface SheetData {
-  notaires: any[];
-  villesInteret: any[];
+  notaires: Notaire[];
+  villesInteret: VilleInteret[];
 }
 
-interface Notaire {
-  id: string;
-  officeNotarial: string;
-  adresse: string;
-  codePostal: string;
-  ville: string;
-  departement: string;
-  telephone?: string;
-  email?: string;
-  siteWeb?: string;
-  latitude?: number;
-  longitude?: number;
-  statut: NotaireStatut;
-  contacts: Contact[];
-  dateModification?: string;
-  notes?: string;
-  nbAssocies: number;
-  nbSalaries: number;
-  notairesAssocies?: string;
-  notairesSalaries?: string;
-  serviceNego: boolean;
-  geoScore?: number;
-  geoStatus?: 'pending' | 'success' | 'error';
-  display_name?: string;
-  geocodingHistory?: GeocodingHistory[];
-  needsGeocoding: boolean;
-}
+export const googleSheetsService = {
+  async loadFromSheet(): Promise<SheetData> {
+    try {
+      console.log('Loading data from sheet');
+      const response = await fetch(`${API_BASE_URL}/sheets`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('API response:', data);
 
-interface VilleInteret {
-  id: string;
-  nom: string;
-  rayon: number;
-  latitude: number;
-  longitude: number;
-  departement: string;
-  population?: number;
-}
+      const notaires = data.notaires || [];
+      const villesInteret = data.villesInteret || [];
+
+      // Vérifier les données des notaires
+      console.log('Checking notaires data:', {
+        total: notaires.length,
+        withStatus: notaires.filter(n => n.statut).length,
+        statuses: notaires.reduce((acc, n) => {
+          acc[n.statut] = (acc[n.statut] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>)
+      });
+
+      console.log('Parsed notaires:', notaires.length);
+      console.log('Parsed villes interet:', villesInteret.length);
+
+      return { notaires, villesInteret };
+    } catch (error) {
+      console.error('Error loading from sheet:', error);
+      throw error;
+    }
+  },
+
+  async saveToSheet(notaire: Notaire | Notaire[]): Promise<void> {
+    try {
+      const notaires = Array.isArray(notaire) ? notaire : [notaire];
+      console.log('Saving notaires to sheet:', notaires.length);
+
+      const response = await fetch(`${API_BASE_URL}/sheets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ notaires }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      console.log('Save successful');
+    } catch (error) {
+      console.error('Error saving to sheet:', error);
+      throw error;
+    }
+  },
+
+  async saveVillesInteret(villesInteret: VilleInteret[]): Promise<void> {
+    try {
+      console.log('Saving villes interet:', villesInteret.length);
+
+      const response = await fetch(`${API_BASE_URL}/sheets/villes-interet`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ villesInteret }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      console.log('Save successful');
+    } catch (error) {
+      console.error('Error saving villes interet:', error);
+      throw error;
+    }
+  },
+
+  async testConfig(): Promise<any> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/sheets/test`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Error testing config:', error);
+      throw error;
+    }
+  }
+};
 
 function parseNotaire(row: any[]): Notaire {
   console.log('Parsing notaire row:', row);
@@ -52,24 +112,25 @@ function parseNotaire(row: any[]): Notaire {
     codePostal,
     ville,
     departement,
-    telephone,
     email,
-    siteWeb,
-    latitude,
-    longitude,
+    notairesAssocies,
+    notairesSalaries,
+    nbAssocies,
+    nbSalaries,
+    serviceNego,
     statut,
     notes,
     contacts,
     dateModification,
-    nbAssocies,
-    nbSalaries,
-    serviceNego,
-    notairesAssocies,
-    notairesSalaries,
+    latitude,
+    longitude,
     geoScore,
-    geocodingHistory,
-    needsGeocoding
+    geocodingHistory
   ] = row;
+
+  // Extraire le nom et le prénom de l'office notarial
+  const [prenom, ...nomParts] = (officeNotarial || '').split(' ');
+  const nom = nomParts.join(' ');
 
   // Construire l'adresse complète pour la comparaison
   const adresseComplete = `${adresse}, ${codePostal} ${ville}`.toLowerCase().trim();
@@ -163,21 +224,25 @@ function parseNotaire(row: any[]): Notaire {
     }
   };
 
-  const notaire = {
+  const notaire: Notaire = {
     id: id || `notaire_${Date.now()}`,
     officeNotarial: officeNotarial || '',
+    departement: departement || '',
+    nom: nom || '',
+    prenom: prenom || '',
     adresse: adresse || '',
     codePostal: codePostal || '',
     ville: ville || '',
-    departement: departement || '',
-    telephone: telephone || '',
+    telephone: '', // Cette colonne n'existe plus dans la nouvelle structure
     email: email || '',
-    siteWeb: siteWeb || '',
-    latitude: parseCoordinate(latitude),
-    longitude: parseCoordinate(longitude),
+    siteWeb: '', // Cette colonne n'existe plus dans la nouvelle structure
     statut: (() => {
       const normalizedStatut = String(statut || '').toLowerCase().trim();
-      console.log('Normalizing statut:', { original: statut, normalized: normalizedStatut });
+      console.log('Normalizing statut:', { 
+        original: statut, 
+        normalized: normalizedStatut,
+        row: row
+      });
       
       // Mapping des valeurs possibles vers les statuts valides
       const statutMap: { [key: string]: NotaireStatut } = {
@@ -194,19 +259,26 @@ function parseNotaire(row: any[]): Notaire {
         'non_defini': 'non_defini'
       };
 
-      return statutMap[normalizedStatut] || 'non_defini';
+      const finalStatut = statutMap[normalizedStatut] || 'non_defini';
+      console.log('Final statut:', finalStatut);
+      return finalStatut;
     })(),
+    dateContact: new Date().toISOString(), // Valeur par défaut
+    dateRappel: new Date().toISOString(), // Valeur par défaut
     notes: notes || '',
-    contacts: parseContacts(contacts),
-    dateModification: parseDate(dateModification),
+    latitude: parseCoordinate(latitude) || 0,
+    longitude: parseCoordinate(longitude) || 0,
+    needsGeocoding: Boolean(shouldGeocode),
     nbAssocies: parseNumber(nbAssocies) || 0,
     nbSalaries: parseNumber(nbSalaries) || 0,
+    contacts: parseContacts(contacts),
+    dateModification: parseDate(dateModification),
     serviceNego: serviceNego === 'oui',
     notairesAssocies: notairesAssocies || '',
     notairesSalaries: notairesSalaries || '',
     geoScore: parseNumber(geoScore),
     geocodingHistory: geocodingHistory ? JSON.parse(geocodingHistory) : [],
-    needsGeocoding: Boolean(shouldGeocode)
+    geoStatus: shouldGeocode ? 'pending' : 'success'
   };
 
   // Log des coordonnées pour debug
@@ -223,244 +295,3 @@ function parseNotaire(row: any[]): Notaire {
   console.log('Parsed notaire:', notaire);
   return notaire;
 }
-
-function parseVilleInteret(row: any[]): VilleInteret {
-  console.log('Parsing ville interet row:', row);
-  const [id, nom, rayon, latitude, longitude, departement, population] = row;
-  
-  // Vérification et conversion des valeurs
-  const parsedRayon = typeof rayon === 'string' ? parseFloat(rayon.replace(',', '.')) : parseFloat(rayon);
-  const parsedLatitude = typeof latitude === 'string' ? parseFloat(latitude.replace(',', '.')) : parseFloat(latitude);
-  const parsedLongitude = typeof longitude === 'string' ? parseFloat(longitude.replace(',', '.')) : parseFloat(longitude);
-  const parsedPopulation = population ? parseInt(population.toString()) : undefined;
-
-  const ville = {
-    id: id || `ville_${Date.now()}`,
-    nom: nom || '',
-    rayon: isNaN(parsedRayon) ? 15 : parsedRayon,
-    latitude: isNaN(parsedLatitude) ? 0 : parsedLatitude,
-    longitude: isNaN(parsedLongitude) ? 0 : parsedLongitude,
-    departement: departement || '',
-    population: parsedPopulation
-  };
-
-  console.log('Parsed ville interet:', ville);
-  return ville;
-}
-
-let loadingCallback: ((loading: boolean) => void) | null = null;
-
-export const setLoadingCallback = (callback: (loading: boolean) => void) => {
-  loadingCallback = callback;
-};
-
-interface APIError {
-  error: string;
-  message: string;
-}
-
-interface APIResponse<T> {
-  data: T;
-}
-
-const API_URL = '/api';
-
-async function fetchWithError<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, options);
-  let data;
-  try {
-    const text = await response.text();
-    console.log('API Raw Response:', text);
-    try {
-      data = JSON.parse(text);
-      console.log('API Parsed Response:', data);
-    } catch (parseError: any) {
-      console.error('Failed to parse JSON:', parseError);
-      throw new Error(`Failed to parse JSON: ${parseError.message}`);
-    }
-  } catch (e) {
-    console.error('Failed to read response:', e);
-    throw new Error('Failed to read server response');
-  }
-
-  if (!response.ok) {
-    const error = data as APIError;
-    throw new Error(error.message || error.error || `HTTP error! status: ${response.status}`);
-  }
-
-  return data as T;
-}
-
-export async function testConfig() {
-  try {
-    const response = await fetch('/api/test');
-    const data = await response.json();
-    console.log('API Test Response:', data);
-    return data;
-  } catch (error) {
-    console.error('API Test Error:', error);
-    throw error;
-  }
-}
-
-async function readSheetData(range: string): Promise<any[][]> {
-  try {
-    console.log('Reading sheet data for range:', range);
-    const response = await fetchWithError<any[][]>(`${API_URL}/sheets?range=${encodeURIComponent(range)}`);
-    console.log('Sheet data response:', response);
-    
-    if (!response || !Array.isArray(response)) {
-      console.error('Invalid response format:', response);
-      throw new Error('Invalid response format: expected array');
-    }
-    
-    console.log('Sheet data rows:', response.length);
-    console.log('First row:', response[0]);
-    
-    return response;
-  } catch (error) {
-    console.error('Error reading sheet data:', error);
-    throw error;
-  }
-}
-
-export async function writeSheetData(range: string, values: any[][]) {
-  try {
-    console.log('Writing sheet data:', {
-      range,
-      valueCount: values.length,
-      firstRow: values[0],
-      lastRow: values[values.length - 1]
-    });
-    return await fetchWithError<any>('/api/sheets', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ range, values }),
-    });
-  } catch (error) {
-    console.error('Erreur lors de l\'écriture des données:', error);
-    throw error;
-  }
-}
-
-export const googleSheetsService = {
-  async loadFromSheet(): Promise<SheetData> {
-    try {
-      console.log('Loading data from sheet');
-      const [notairesData, villesInteretData] = await Promise.all([
-        readSheetData('Notaires!A2:V'),
-        readSheetData('VillesInteret!A2:G')
-      ]);
-
-      console.log('Notaires data rows:', notairesData.length);
-      console.log('Villes interet data rows:', villesInteretData.length);
-
-      const notaires = notairesData.map(row => parseNotaire(row));
-      const villesInteret = villesInteretData.map(row => parseVilleInteret(row));
-
-      console.log('Parsed notaires:', notaires.length);
-      console.log('Parsed villes interet:', villesInteret.length);
-
-      return { notaires, villesInteret };
-    } catch (error) {
-      console.error('Error loading from sheet:', error);
-      throw error;
-    }
-  },
-
-  async saveToSheet(notaire: Notaire | Notaire[]): Promise<void> {
-    try {
-      const notaires = Array.isArray(notaire) ? notaire : [notaire];
-      console.log('Saving notaires to sheet:', notaires.length);
-
-      // Préparer les données pour Google Sheets
-      const rows = notaires.map(n => [
-        n.id,
-        n.officeNotarial,
-        n.adresse,
-        n.codePostal,
-        n.ville,
-        n.departement,
-        n.telephone || '',
-        n.email || '',
-        n.siteWeb || '',
-        n.latitude || '',
-        n.longitude || '',
-        n.statut,
-        n.notes || '',
-        JSON.stringify(n.contacts),
-        n.dateModification,
-        n.nbAssocies,
-        n.nbSalaries,
-        n.serviceNego ? 'oui' : 'non',
-        n.notairesAssocies || '',
-        n.notairesSalaries || '',
-        n.geoScore || '',
-        JSON.stringify(n.geocodingHistory || []),
-        n.needsGeocoding || false // Assurer que needsGeocoding est toujours un booléen
-      ]);
-
-      // Trouver les lignes existantes
-      const existingData = await readSheetData('Notaires!A2:W');
-      const existingIds = new Set(existingData.map(row => row[0]));
-
-      // Séparer les nouvelles lignes et les mises à jour
-      const newRows: any[][] = [];
-      const updateRows: { range: string; values: any[][] }[] = [];
-
-      rows.forEach((row, index) => {
-        const id = row[0];
-        if (existingIds.has(id)) {
-          // Trouver l'index de la ligne existante
-          const existingIndex = existingData.findIndex(r => r[0] === id);
-          if (existingIndex !== -1) {
-            updateRows.push({
-              range: `Notaires!A${existingIndex + 2}:W${existingIndex + 2}`,
-              values: [row]
-            });
-          }
-        } else {
-          newRows.push(row);
-        }
-      });
-
-      // Ajouter les nouvelles lignes
-      if (newRows.length > 0) {
-        console.log('Adding new rows:', newRows.length);
-        await writeSheetData('Notaires!A2:W', newRows);
-      }
-
-      // Mettre à jour les lignes existantes
-      for (const update of updateRows) {
-        console.log('Updating row:', update.range);
-        await writeSheetData(update.range, update.values);
-      }
-
-      console.log('Save completed successfully');
-    } catch (error) {
-      console.error('Error saving to sheet:', error);
-      throw error;
-    }
-  },
-
-  async saveVillesInteret(villesInteret: VilleInteret[]): Promise<void> {
-    try {
-      const values = villesInteret.map(ville => [
-        ville.id,
-        ville.nom,
-        ville.rayon,
-        ville.latitude,
-        ville.longitude,
-        ville.departement,
-        ville.population
-      ]);
-      await writeSheetData('VillesInteret!A2:G', values);
-      console.log('Villes d\'intérêt sauvegardées avec succès');
-    } catch (error) {
-      console.error('Erreur lors de la sauvegarde des villes d\'intérêt:', error);
-      throw error;
-    }
-  }
-};

@@ -8,7 +8,7 @@ import NotairesTable from './components/NotairesTable';
 import { storageService } from './services/storage';
 import './App.css';
 import Dashboard from './components/Dashboard';
-import { googleSheetsService, testConfig } from './services/googleSheets';
+import { googleSheetsService } from './services/googleSheets';
 import Toast from './components/Toast';
 import { geocodeAddress } from './services/geocoding';
 import Logo from './components/Logo';
@@ -164,7 +164,7 @@ const App: React.FC = () => {
     const checkConfig = async () => {
       try {
         console.log('Testing API configuration...');
-        const config = await testConfig();
+        const config = await googleSheetsService.testConfig();
         console.log('API configuration:', config);
       } catch (error) {
         console.error('API configuration error:', error);
