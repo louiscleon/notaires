@@ -6,6 +6,12 @@ interface SheetData {
   villesInteret: VilleInteret[];
 }
 
+// Définition des plages de cellules pour Google Sheets
+const SHEET_RANGES = {
+  NOTAIRES: 'Notaires!A2:Z',
+  VILLES_INTERET: 'Villes d\'intérêt!A2:D'
+} as const;
+
 async function fetchWithCors(url: string, options?: RequestInit): Promise<Response> {
   try {
     console.log('Fetching URL:', url, 'with options:', options);
@@ -44,7 +50,7 @@ export const googleSheetsService = {
   async loadFromSheet(): Promise<SheetData> {
     try {
       console.log('Loading data from sheet');
-      const response = await fetchWithCors(`${API_BASE_URL}/sheets`);
+      const response = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.NOTAIRES}`);
       const data = await response.json();
       console.log('API response:', data);
 
@@ -82,7 +88,10 @@ export const googleSheetsService = {
 
       const response = await fetchWithCors(`${API_BASE_URL}/sheets`, {
         method: 'POST',
-        body: JSON.stringify({ notaires }),
+        body: JSON.stringify({ 
+          notaires,
+          range: SHEET_RANGES.NOTAIRES
+        }),
       });
 
       const data = await response.json();
@@ -99,7 +108,10 @@ export const googleSheetsService = {
 
       const response = await fetchWithCors(`${API_BASE_URL}/sheets/villes-interet`, {
         method: 'POST',
-        body: JSON.stringify({ villesInteret }),
+        body: JSON.stringify({ 
+          villesInteret,
+          range: SHEET_RANGES.VILLES_INTERET
+        }),
       });
 
       const data = await response.json();
@@ -113,7 +125,7 @@ export const googleSheetsService = {
   async testConfig(): Promise<any> {
     try {
       console.log('Testing API configuration...');
-      const response = await fetchWithCors(`${API_BASE_URL}/sheets/test`);
+      const response = await fetchWithCors(`${API_BASE_URL}/sheets/test?range=${SHEET_RANGES.NOTAIRES}`);
       const data = await response.json();
       console.log('Test response:', data);
       return data;
