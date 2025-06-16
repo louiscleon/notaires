@@ -102,20 +102,27 @@ function parseNotaire(row: any[]): Notaire {
 }
 
 function parseVilleInteret(row: any[]): VilleInteret {
+  console.log('Parsing ville interet row:', row);
   const [id, nom, rayon, latitude, longitude, departement, population] = row;
-  return {
+  
+  // Vérification et conversion des valeurs
+  const parsedRayon = typeof rayon === 'string' ? parseFloat(rayon.replace(',', '.')) : parseFloat(rayon);
+  const parsedLatitude = typeof latitude === 'string' ? parseFloat(latitude.replace(',', '.')) : parseFloat(latitude);
+  const parsedLongitude = typeof longitude === 'string' ? parseFloat(longitude.replace(',', '.')) : parseFloat(longitude);
+  const parsedPopulation = population ? parseInt(population.toString()) : undefined;
+
+  const ville = {
     id: id || `ville_${Date.now()}`,
     nom: nom || '',
-    rayon: parseFloat(rayon) || 15,
-    latitude: latitude !== undefined && latitude !== null && latitude !== '' && !isNaN(Number(String(latitude).trim().replace(/,/g, '.')))
-      ? Number(String(latitude).trim().replace(/,/g, '.'))
-      : 0,
-    longitude: longitude !== undefined && longitude !== null && longitude !== '' && !isNaN(Number(String(longitude).trim().replace(/,/g, '.')))
-      ? Number(String(longitude).trim().replace(/,/g, '.'))
-      : 0,
+    rayon: isNaN(parsedRayon) ? 15 : parsedRayon,
+    latitude: isNaN(parsedLatitude) ? 0 : parsedLatitude,
+    longitude: isNaN(parsedLongitude) ? 0 : parsedLongitude,
     departement: departement || '',
-    population: population ? parseInt(population) : undefined
+    population: parsedPopulation
   };
+
+  console.log('Parsed ville interet:', ville);
+  return ville;
 }
 
 let loadingCallback: ((loading: boolean) => void) | null = null;
@@ -241,21 +248,25 @@ export const googleSheetsService = {
   async loadFromSheet(): Promise<SheetData> {
     try {
       console.log('Loading data from sheets...');
-      const [notairesRows, villesRows] = await Promise.all([
-        readSheetData('Notaires!A2:T'),
-        readSheetData('VillesInteret!A2:G')
-      ]);
-
-      console.log('Raw data received:', {
-        notairesRows,
-        villesRows
-      });
-
-      // Parse les données en objets structurés
+      
+      // Charger les notaires
+      const notairesRows = await readSheetData('Notaires!A2:T');
+      console.log('Notaires rows loaded:', notairesRows);
       const notaires = (notairesRows || []).map(parseNotaire);
-      const villesInteret = (villesRows || []).map(parseVilleInteret);
+      
+      // Charger les villes d'intérêt
+      let villesInteret: VilleInteret[] = [];
+      try {
+        const villesRows = await readSheetData('VillesInteret!A2:G');
+        console.log('Villes rows loaded:', villesRows);
+        villesInteret = (villesRows || []).map(parseVilleInteret);
+      } catch (error) {
+        console.error('Error loading villes interet:', error);
+        // En cas d'erreur, on continue avec un tableau vide
+        villesInteret = [];
+      }
 
-      console.log('Parsed data:', {
+      console.log('Data loaded:', {
         notairesCount: notaires.length,
         villesCount: villesInteret.length,
         sampleNotaire: notaires[0],
