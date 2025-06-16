@@ -94,6 +94,54 @@ function parseNotaire(row: any[]): Notaire {
     geocodingHistory
   });
 
+  // Fonction utilitaire pour parser les nombres
+  const parseNumber = (value: any): number | undefined => {
+    if (value === undefined || value === null || value === '') return undefined;
+    const num = Number(String(value).trim().replace(/,/g, '.'));
+    return isNaN(num) ? undefined : num;
+  };
+
+  // Fonction utilitaire pour parser les dates
+  const parseDate = (value: any): string => {
+    if (!value || value === '[]') return new Date().toISOString();
+    try {
+      return new Date(value).toISOString();
+    } catch {
+      return new Date().toISOString();
+    }
+  };
+
+  // Fonction utilitaire pour parser les contacts
+  const parseContacts = (value: any): Contact[] => {
+    if (!value || value === '[]') return [];
+    try {
+      // Si c'est déjà un tableau, le retourner
+      if (Array.isArray(value)) return value;
+      // Si c'est une chaîne JSON, essayer de la parser
+      if (typeof value === 'string') {
+        try {
+          return JSON.parse(value);
+        } catch {
+          // Si ce n'est pas du JSON valide, créer un contact avec le texte comme commentaire
+          return [{
+            date: new Date().toISOString(),
+            type: 'initial',
+            par: 'Fanny',
+            statut: 'non_contacte',
+            reponseRecue: {
+              date: new Date().toISOString(),
+              positive: false,
+              commentaire: value
+            }
+          }];
+        }
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  };
+
   const notaire = {
     id: id || `notaire_${Date.now()}`,
     officeNotarial: officeNotarial || '',
@@ -104,22 +152,18 @@ function parseNotaire(row: any[]): Notaire {
     telephone: telephone || '',
     email: email || '',
     siteWeb: siteWeb || '',
-    latitude: latitude !== undefined && latitude !== null && latitude !== '' && !isNaN(Number(String(latitude).trim().replace(/,/g, '.')))
-      ? Number(String(latitude).trim().replace(/,/g, '.'))
-      : undefined,
-    longitude: longitude !== undefined && longitude !== null && longitude !== '' && !isNaN(Number(String(longitude).trim().replace(/,/g, '.')))
-      ? Number(String(longitude).trim().replace(/,/g, '.'))
-      : undefined,
+    latitude: parseNumber(latitude),
+    longitude: parseNumber(longitude),
     statut: statut || 'nouveau',
     notes: notes || '',
-    contacts: contacts ? JSON.parse(contacts) : [],
-    dateModification: dateModification || new Date().toISOString(),
-    nbAssocies: parseInt(nbAssocies) || 0,
-    nbSalaries: parseInt(nbSalaries) || 0,
+    contacts: parseContacts(contacts),
+    dateModification: parseDate(dateModification),
+    nbAssocies: parseNumber(nbAssocies) || 0,
+    nbSalaries: parseNumber(nbSalaries) || 0,
     serviceNego: serviceNego === 'oui',
     notairesAssocies: notairesAssocies || '',
     notairesSalaries: notairesSalaries || '',
-    geoScore: geoScore ? parseFloat(geoScore) : undefined,
+    geoScore: parseNumber(geoScore),
     geocodingHistory: geocodingHistory ? JSON.parse(geocodingHistory) : []
   };
 
