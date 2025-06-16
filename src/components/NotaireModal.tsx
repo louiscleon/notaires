@@ -103,15 +103,10 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   const [adresseSuggestions, setAdresseSuggestions] = useState<AdresseSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const hasUnsavedChanges = useRef(false);
+  const [isSaving, setIsSaving] = useState(false);
 
+  // Mettre à jour l'état local quand le notaire change
   useEffect(() => {
-    // Vérifier que le notaire a un ID valide lors des mises à jour
-    if (!notaire.id) {
-      console.error('Notaire sans ID reçu dans la mise à jour de NotaireModal');
-      setSaveError('Erreur : ID du notaire manquant');
-      return;
-    }
     setEditedNotaire(notaire);
   }, [notaire]);
 
@@ -129,35 +124,38 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     return () => clearTimeout(timeoutId);
   }, [editedNotaire.adresse]);
 
-  // Sauvegarder les modifications non enregistrées à la fermeture
-  useEffect(() => {
-    if (!isOpen && hasUnsavedChanges.current) {
-      saveAndSync(editedNotaire);
-      hasUnsavedChanges.current = false;
+  const saveAndSync = async (updatedNotaire: Notaire) => {
+    if (isSaving) return;
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      await onSave(updatedNotaire);
+      await googleSheetsService.saveToSheet(updatedNotaire);
+      setEditedNotaire(updatedNotaire);
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation avec Google Sheets:', error);
+      setSaveError('Erreur lors de la sauvegarde. Les modifications seront perdues au rechargement de la page.');
+      throw error;
+    } finally {
+      setIsSaving(false);
     }
-  }, [isOpen]);
+  };
 
   const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
-    // S'assurer que l'ID est toujours présent
-    if (!editedNotaire.id) {
-      console.error('ID du notaire manquant');
-      setSaveError('Erreur : ID du notaire manquant');
-      return;
-    }
-
     const updatedNotaire = {
       ...editedNotaire,
       [name]: value,
-      id: editedNotaire.id,
       dateModification: new Date().toISOString()
     };
-    setEditedNotaire(updatedNotaire);
-    hasUnsavedChanges.current = true;
 
-    // Sauvegarder immédiatement
-    await saveAndSync(updatedNotaire);
+    try {
+      await saveAndSync(updatedNotaire);
+    } catch (error) {
+      // L'erreur est déjà gérée dans saveAndSync
+    }
 
     if (name === 'adresse') {
       setShowSuggestions(true);
@@ -165,17 +163,10 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   };
 
   const handleSelectAdresse = async (suggestion: AdresseSuggestion) => {
-    if (!editedNotaire.id) {
-      console.error('ID du notaire manquant');
-      setSaveError('Erreur : ID du notaire manquant');
-      return;
-    }
-
     setGeocodingStatus('Géocodage de la nouvelle adresse...');
     
     const updatedNotaire = {
       ...editedNotaire,
-      id: editedNotaire.id,
       adresse: suggestion.label,
       codePostal: suggestion.postcode,
       ville: suggestion.city,
@@ -196,73 +187,45 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     } catch (error) {
       console.error('Erreur lors du géocodage:', error);
       setGeocodingStatus('Erreur lors du géocodage de l\'adresse');
-      await saveAndSync(updatedNotaire);
     } finally {
       setShowSuggestions(false);
     }
   };
 
   const handleCheckboxChange = async (name: string, checked: boolean) => {
-    if (!editedNotaire.id) {
-      console.error('ID du notaire manquant');
-      setSaveError('Erreur : ID du notaire manquant');
-      return;
-    }
-
     const updatedNotaire = {
       ...editedNotaire,
-      id: editedNotaire.id,
       [name]: checked,
       dateModification: new Date().toISOString()
     };
-    setEditedNotaire(updatedNotaire);
-    await saveAndSync(updatedNotaire);
+
+    try {
+      await saveAndSync(updatedNotaire);
+    } catch (error) {
+      // L'erreur est déjà gérée dans saveAndSync
+    }
   };
 
   const handleStatusChange = async (value: NotaireStatut) => {
-    if (!editedNotaire.id) {
-      console.error('ID du notaire manquant');
-      setSaveError('Erreur : ID du notaire manquant');
-      return;
-    }
-
     const updatedNotaire = {
       ...editedNotaire,
-      id: editedNotaire.id,
       statut: value,
       dateModification: new Date().toISOString()
     };
-    setEditedNotaire(updatedNotaire);
-    await saveAndSync(updatedNotaire);
-  };
 
-  const saveAndSync = async (updatedNotaire: Notaire) => {
     try {
-      setSaveError(null);
-      onSave(updatedNotaire);
-      await googleSheetsService.saveToSheet(updatedNotaire);
-      hasUnsavedChanges.current = false;
+      await saveAndSync(updatedNotaire);
     } catch (error) {
-      console.error('Erreur lors de la synchronisation avec Google Sheets:', error);
-      setSaveError('Erreur lors de la sauvegarde. Les modifications seront perdues au rechargement de la page.');
-      hasUnsavedChanges.current = true;
+      // L'erreur est déjà gérée dans saveAndSync
     }
   };
 
-  const handleClose = async () => {
-    // Si des modifications sont en cours, les sauvegarder
-    if (hasUnsavedChanges.current) {
-      try {
-        await saveAndSync(editedNotaire);
-      } catch (error) {
-        console.error('Erreur lors de la sauvegarde finale:', error);
-        setSaveError('Erreur lors de la sauvegarde. Voulez-vous réessayer ?');
-        return; // Ne pas fermer si la sauvegarde a échoué
-      }
+  const handleClose = () => {
+    if (isSaving) {
+      setSaveError('Sauvegarde en cours, veuillez patienter...');
+      return;
     }
     
-    // Réinitialiser l'état
-    hasUnsavedChanges.current = false;
     setSaveError(null);
     onClose();
   };

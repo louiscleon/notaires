@@ -291,10 +291,19 @@ const App: React.FC = () => {
   };
 
   const handleNotaireUpdate = async (updatedNotaire: Notaire) => {
-    const newNotaires = notaires.map(n => n.id === updatedNotaire.id ? updatedNotaire : n);
-    setNotaires(newNotaires);
     try {
+      // Mettre à jour l'état local immédiatement
+      const newNotaires = notaires.map(n => n.id === updatedNotaire.id ? updatedNotaire : n);
+      setNotaires(newNotaires);
+
+      // Sauvegarder dans Google Sheets
       await googleSheetsService.saveToSheet(updatedNotaire);
+
+      // Recharger les données pour s'assurer de la cohérence
+      const response = await googleSheetsService.loadFromSheet();
+      setNotaires(response.notaires);
+
+      addToast('Modifications sauvegardées avec succès', 'success');
     } catch (error) {
       console.error('Erreur de synchronisation:', error);
       addToast(
@@ -303,8 +312,14 @@ const App: React.FC = () => {
           : 'Erreur de synchronisation inconnue',
         'error'
       );
+
       // En cas d'erreur, recharger les données pour s'assurer de la cohérence
-      await loadData();
+      try {
+        const response = await googleSheetsService.loadFromSheet();
+        setNotaires(response.notaires);
+      } catch (reloadError) {
+        console.error('Erreur lors du rechargement des données:', reloadError);
+      }
     }
   };
 
