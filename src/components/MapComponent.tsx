@@ -236,28 +236,27 @@ const MapComponent: React.FC<Props> = ({
     console.log('Total notaires reçus:', filteredNotaires.length);
     console.log('Notaires avec coordonnées:', filteredNotaires.filter(n => n.latitude && n.longitude).length);
     console.log('Notaires sans coordonnées:', filteredNotaires.filter(n => !n.latitude || !n.longitude).length);
-    console.log('Notaires nécessitant un géocodage:', filteredNotaires.filter(n => n.needsGeocoding).length);
-    console.log('Villes d\'intérêt:', villesInteret);
-    console.log('Villes d\'intérêt avec coordonnées:', villesInteret.filter(v => v.latitude && v.longitude).length);
 
     // Filtrer les notaires qui ont déjà des coordonnées valides
     let notairesValides = filteredNotaires.filter(n =>
       typeof n.latitude === 'number' &&
       typeof n.longitude === 'number' &&
       !isNaN(n.latitude) &&
-      !isNaN(n.longitude) &&
-      !n.needsGeocoding
+      !isNaN(n.longitude)
     );
     
     console.log('Notaires valides après filtrage:', notairesValides.length);
-    console.log('Exemple de notaire valide:', notairesValides[0]);
     
     // Mettre à jour les notaires avec coordonnées
     setNotairesAvecCoordonnees(notairesValides);
 
-    // Si le géocodage initial n'a pas été fait et qu'il y a des notaires à géocoder
+    // Ne faire le géocodage que pour les notaires qui n'ont pas d'adresse ou dont l'adresse a changé
     if (!initialGeocodingDone.current && !geocodingRef.current) {
-      const notairesAGeocoder = filteredNotaires.filter(n => n.needsGeocoding);
+      const notairesAGeocoder = filteredNotaires.filter(n => 
+        !n.latitude || !n.longitude || // Pas de coordonnées
+        !n.adresse || !n.codePostal || !n.ville || // Pas d'adresse complète
+        n.needsGeocoding // Adresse modifiée
+      );
 
       if (notairesAGeocoder.length > 0) {
         console.log('Début du géocodage pour', notairesAGeocoder.length, 'notaires');
