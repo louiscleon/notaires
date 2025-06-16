@@ -263,12 +263,7 @@ async function fetchWithError<T>(url: string, options?: RequestInit): Promise<T>
     throw new Error(error.message || error.error || `HTTP error! status: ${response.status}`);
   }
 
-  if (!data.data) {
-    console.error('Invalid response format:', data);
-    throw new Error('Invalid response format: missing data property');
-  }
-
-  return data.data as T;
+  return data as T;
 }
 
 export async function testConfig() {
@@ -286,18 +281,18 @@ export async function testConfig() {
 async function readSheetData(range: string): Promise<any[][]> {
   try {
     console.log('Reading sheet data for range:', range);
-    const response = await fetchWithError<APIResponse<any[][]>>(`${API_URL}/sheets?range=${encodeURIComponent(range)}`);
+    const response = await fetchWithError<any[][]>(`${API_URL}/sheets?range=${encodeURIComponent(range)}`);
     console.log('Sheet data response:', response);
     
-    if (!response.data) {
-      console.error('No data in response');
-      throw new Error('No data received from API');
+    if (!response || !Array.isArray(response)) {
+      console.error('Invalid response format:', response);
+      throw new Error('Invalid response format: expected array');
     }
     
-    console.log('Sheet data rows:', response.data.length);
-    console.log('First row:', response.data[0]);
+    console.log('Sheet data rows:', response.length);
+    console.log('First row:', response[0]);
     
-    return response.data;
+    return response;
   } catch (error) {
     console.error('Error reading sheet data:', error);
     throw error;
