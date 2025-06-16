@@ -30,6 +30,8 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isEditing, setIsEditing] = useState(false);
+  const [lastUpdateTime, setLastUpdateTime] = useState<number>(0);
+  const UPDATE_COOLDOWN = 2000; // 2 secondes de délai entre les mises à jour
 
   const addToast = (message: string, type: 'error' | 'success' | 'warning') => {
     const id = Date.now();
@@ -174,6 +176,13 @@ const App: React.FC = () => {
   }, []);
 
   const handleNotaireUpdate = async (updatedNotaire: Notaire) => {
+    const now = Date.now();
+    if (now - lastUpdateTime < UPDATE_COOLDOWN) {
+      // Ignorer la mise à jour si elle arrive trop tôt
+      return;
+    }
+    setLastUpdateTime(now);
+
     try {
       // Mettre à jour l'état local immédiatement pour une meilleure UX
       setNotaires(prevNotaires => 
@@ -183,13 +192,13 @@ const App: React.FC = () => {
       // Sauvegarder dans Google Sheets
       await googleSheetsService.saveToSheet(updatedNotaire);
 
-      // Supprimer les messages de succès existants avant d'en ajouter un nouveau
-      setToasts(prevToasts => prevToasts.filter(toast => toast.type !== 'success'));
+      // Supprimer tous les messages existants avant d'en ajouter un nouveau
+      setToasts([]);
       addToast('Modifications sauvegardées avec succès', 'success');
     } catch (error) {
       console.error('Erreur lors de la mise à jour:', error);
-      // Supprimer les messages d'erreur existants avant d'en ajouter un nouveau
-      setToasts(prevToasts => prevToasts.filter(toast => toast.type !== 'error'));
+      // Supprimer tous les messages existants avant d'en ajouter un nouveau
+      setToasts([]);
       addToast(
         error instanceof Error 
           ? `Erreur lors de la sauvegarde : ${error.message}`
