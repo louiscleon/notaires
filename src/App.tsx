@@ -183,10 +183,6 @@ const App: React.FC = () => {
       // Sauvegarder dans Google Sheets
       await googleSheetsService.saveToSheet(updatedNotaire);
 
-      // Recharger les données depuis Google Sheets pour s'assurer que tout est synchronisé
-      const response = await googleSheetsService.loadFromSheet();
-      setNotaires(response.notaires);
-
       addToast('Modifications sauvegardées avec succès', 'success');
     } catch (error) {
       console.error('Erreur lors de la mise à jour:', error);
