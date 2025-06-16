@@ -23,7 +23,8 @@ try {
     type: credentials.type,
     projectId: credentials.project_id,
     hasPrivateKey: !!credentials.private_key,
-    hasClientEmail: !!credentials.client_email
+    hasClientEmail: !!credentials.client_email,
+    clientEmail: credentials.client_email
   });
 } catch (error) {
   console.error('Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY:', error);
@@ -50,5 +51,7 @@ export const sheets = google.sheets({ version: 'v4', auth });
 export const SPREADSHEET_ID = process.env.REACT_APP_SPREADSHEET_ID;
 console.log('Configuration complete:', {
   hasSpreadsheetId: !!SPREADSHEET_ID,
-  spreadsheetId: SPREADSHEET_ID
+  spreadsheetId: SPREADSHEET_ID,
+  hasAuth: !!auth,
+  hasSheets: !!sheets
 }); 

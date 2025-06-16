@@ -39,16 +39,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
         }
 
-        console.log('Fetching data:', { range, spreadsheetId: SPREADSHEET_ID });
+        console.log('Fetching data:', { 
+          range, 
+          spreadsheetId: SPREADSHEET_ID,
+          hasSpreadsheetId: !!SPREADSHEET_ID
+        });
+
         try {
+          console.log('Calling Google Sheets API...');
           const response = await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
             range,
           });
 
+          console.log('Raw Google Sheets response:', safeStringify(response));
+
           // Ensure we have valid data
-          if (!response.data || !response.data.values) {
-            console.log('No data found in response:', response.data);
+          if (!response.data) {
+            console.error('No data in response from Google Sheets');
+            return res.status(500).json({
+              error: 'Google Sheets API Error',
+              message: 'No data in response'
+            });
+          }
+
+          if (!response.data.values) {
+            console.log('No values in response, returning empty array');
             return res.status(200).json({
               data: []
             });
@@ -60,7 +76,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             firstRow: response.data.values[0],
             lastRow: response.data.values[response.data.values.length - 1]
           };
-          console.log('Data fetched:', safeStringify(result));
+          console.log('Data fetched successfully:', safeStringify(result));
 
           // Ensure we're sending a properly formatted JSON response
           return res.status(200).json({
