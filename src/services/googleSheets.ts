@@ -46,13 +46,26 @@ async function fetchWithCors(url: string, options?: RequestInit): Promise<Respon
   }
 }
 
+async function parseJsonResponse(response: Response): Promise<any> {
+  const text = await response.text();
+  console.log('Raw API response:', text);
+  
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    console.error('JSON Parse Error:', error);
+    console.error('Failed to parse response:', text);
+    throw new Error(`Invalid JSON response: ${text}`);
+  }
+}
+
 export const googleSheetsService = {
   async loadFromSheet(): Promise<SheetData> {
     try {
       console.log('Loading data from sheet');
       const response = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.NOTAIRES}`);
-      const data = await response.json();
-      console.log('API response:', data);
+      const data = await parseJsonResponse(response);
+      console.log('Parsed API response:', data);
 
       if (!data || typeof data !== 'object') {
         throw new Error('Invalid API response format');
@@ -94,7 +107,7 @@ export const googleSheetsService = {
         }),
       });
 
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       console.log('Save response:', data);
     } catch (error) {
       console.error('Error saving to sheet:', error);
@@ -114,7 +127,7 @@ export const googleSheetsService = {
         }),
       });
 
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       console.log('Save response:', data);
     } catch (error) {
       console.error('Error saving villes interet:', error);
@@ -126,7 +139,7 @@ export const googleSheetsService = {
     try {
       console.log('Testing API configuration...');
       const response = await fetchWithCors(`${API_BASE_URL}/sheets/test?range=${SHEET_RANGES.NOTAIRES}`);
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       console.log('Test response:', data);
       return data;
     } catch (error) {
