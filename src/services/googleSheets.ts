@@ -72,14 +72,15 @@ export const googleSheetsService = {
       console.log('Loading data from sheet');
       const response = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.NOTAIRES}`);
       const data = await parseJsonResponse(response);
-      console.log('Parsed API response:', data);
+      console.log('Raw sheet data:', data);
 
-      if (!data || typeof data !== 'object') {
-        throw new Error('Invalid API response format');
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid API response format: expected array of rows');
       }
 
-      const notaires = Array.isArray(data.notaires) ? data.notaires : [];
-      const villesInteret = Array.isArray(data.villesInteret) ? data.villesInteret : [];
+      // Convertir les lignes brutes en objets Notaire
+      const notaires = data.map(row => parseNotaire(row));
+      const villesInteret: VilleInteret[] = []; // Pour l'instant, nous ne chargeons pas les villes d'intérêt
 
       // Vérifier les données des notaires
       console.log('Checking notaires data:', {

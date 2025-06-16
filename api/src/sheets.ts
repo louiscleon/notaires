@@ -68,14 +68,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(200).json([]);
           }
 
-          const result = {
-            hasData: true,
-            rowCount: response.data.values.length,
-            firstRow: response.data.values[0],
-            lastRow: response.data.values[response.data.values.length - 1]
-          };
-          console.log('Data fetched successfully:', safeStringify(result));
-
           // Return the values array directly
           return res.status(200).json(response.data.values);
         } catch (e) {
