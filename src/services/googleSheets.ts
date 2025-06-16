@@ -137,11 +137,18 @@ async function fetchWithError<T>(url: string, options?: RequestInit): Promise<T>
   const response = await fetch(url, options);
   let data;
   try {
-    data = await response.json();
-    console.log('API Response:', data);
+    const text = await response.text();
+    console.log('API Raw Response:', text);
+    try {
+      data = JSON.parse(text);
+      console.log('API Parsed Response:', data);
+    } catch (parseError: any) {
+      console.error('Failed to parse JSON:', parseError);
+      throw new Error(`Failed to parse JSON: ${parseError.message}`);
+    }
   } catch (e) {
-    console.error('Failed to parse response:', e);
-    throw new Error('Failed to parse server response');
+    console.error('Failed to read response:', e);
+    throw new Error('Failed to read server response');
   }
 
   if (!response.ok) {
@@ -172,14 +179,36 @@ export async function testConfig() {
 export async function readSheetData(range: string) {
   try {
     console.log('Reading sheet data:', { range });
-    const data = await fetchWithError<any[][]>(`/api/sheets?range=${encodeURIComponent(range)}`);
+    const response = await fetch(`/api/sheets?range=${encodeURIComponent(range)}`);
+    const text = await response.text();
+    console.log('Raw API response:', text);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    let data;
+    try {
+      data = JSON.parse(text);
+      console.log('Parsed API response:', data);
+    } catch (parseError: any) {
+      console.error('Failed to parse JSON:', parseError);
+      throw new Error(`Failed to parse JSON: ${parseError.message}`);
+    }
+
+    if (!data || !data.data) {
+      console.error('Invalid response format:', data);
+      throw new Error('Invalid response format: missing data property');
+    }
+
     console.log('Sheet data received:', {
-      hasData: !!data,
-      rowCount: data?.length || 0,
-      firstRow: data?.[0],
-      lastRow: data?.[data.length - 1]
+      hasData: !!data.data,
+      rowCount: data.data?.length || 0,
+      firstRow: data.data?.[0],
+      lastRow: data.data?.[data.data.length - 1]
     });
-    return data;
+
+    return data.data;
   } catch (error) {
     console.error('Erreur lors de la lecture des données:', error);
     throw error;
@@ -216,11 +245,16 @@ export const googleSheetsService = {
         readSheetData('VillesInteret!A2:G')
       ]);
 
+      console.log('Raw data received:', {
+        notairesRows,
+        villesRows
+      });
+
       // Parse les données en objets structurés
       const notaires = (notairesRows || []).map(parseNotaire);
       const villesInteret = (villesRows || []).map(parseVilleInteret);
 
-      console.log('Data loaded:', {
+      console.log('Parsed data:', {
         notairesCount: notaires.length,
         villesCount: villesInteret.length,
         sampleNotaire: notaires[0],
