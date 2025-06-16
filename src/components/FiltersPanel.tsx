@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Filtres, VilleInteret, NotaireStatut } from '../types';
+import { Filtres, VilleInteret, NotaireStatut, ContactStatut } from '../types';
 import { geocodeAddress } from '../services/geocoding';
 import { googleSheetsService } from '../services/googleSheets';
 import Modal from './Modal';
@@ -228,7 +228,7 @@ const VillesInteretModal = React.memo(({
         rayon: nouveauRayon,
         latitude: coords.lat,
         longitude: coords.lon,
-        departement: suggestion.departement,
+        departement: suggestion.departement || suggestion.code.substring(0, 2),
         population: suggestion.population
       };
 
@@ -474,12 +474,22 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
     });
   };
 
+  const toggleContactStatut = (statut: ContactStatut) => {
+    const newStatuts = filtres.contactStatuts?.includes(statut)
+      ? filtres.contactStatuts.filter(s => s !== statut)
+      : [...(filtres.contactStatuts || []), statut];
+    onFiltresChange({
+      ...filtres,
+      contactStatuts: newStatuts
+    });
+  };
+
   return (
     <div className="space-y-3 md:space-y-6">
       {/* Filtres principaux */}
       <div className="space-y-3 md:space-y-4">
         <div className="bg-white rounded-xl shadow-sm p-3 md:p-4 space-y-3 md:space-y-4">
-          <h3 className="text-sm font-medium text-gray-900">Statut</h3>
+          <h3 className="text-sm font-medium text-gray-900">Statut du notaire</h3>
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => toggleStatut('favori')}
@@ -515,6 +525,72 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
               onClick={() => onFiltresChange({ ...filtres, statuts: [] })}
               className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
                 filtres.statuts.length === 0
+                  ? 'bg-teal-100 text-teal-800 ring-2 ring-teal-600'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-teal-50'
+              }`}
+            >
+              👥 Tous
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-3 md:p-4 space-y-3 md:space-y-4">
+          <h3 className="text-sm font-medium text-gray-900">Statut du contact</h3>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => toggleContactStatut('non_contacte')}
+              className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                filtres.contactStatuts?.includes('non_contacte')
+                  ? 'bg-gray-100 text-gray-800 ring-2 ring-gray-600'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              📝 Non contacté
+            </button>
+            <button
+              onClick={() => toggleContactStatut('mail_envoye')}
+              className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                filtres.contactStatuts?.includes('mail_envoye')
+                  ? 'bg-blue-100 text-blue-800 ring-2 ring-blue-600'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-blue-50'
+              }`}
+            >
+              📧 Mail envoyé
+            </button>
+            <button
+              onClick={() => toggleContactStatut('relance_envoyee')}
+              className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                filtres.contactStatuts?.includes('relance_envoyee')
+                  ? 'bg-yellow-100 text-yellow-800 ring-2 ring-yellow-600'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-yellow-50'
+              }`}
+            >
+              🔄 Relance envoyée
+            </button>
+            <button
+              onClick={() => toggleContactStatut('reponse_recue')}
+              className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                filtres.contactStatuts?.includes('reponse_recue')
+                  ? 'bg-green-100 text-green-800 ring-2 ring-green-600'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-green-50'
+              }`}
+            >
+              ✉️ Réponse reçue
+            </button>
+            <button
+              onClick={() => toggleContactStatut('cloture')}
+              className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                filtres.contactStatuts?.includes('cloture')
+                  ? 'bg-purple-100 text-purple-800 ring-2 ring-purple-600'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-purple-50'
+              }`}
+            >
+              ✅ Clôturé
+            </button>
+            <button
+              onClick={() => onFiltresChange({ ...filtres, contactStatuts: [] })}
+              className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                !filtres.contactStatuts?.length
                   ? 'bg-teal-100 text-teal-800 ring-2 ring-teal-600'
                   : 'bg-white text-gray-700 border border-gray-200 hover:bg-teal-50'
               }`}
@@ -653,7 +729,8 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
           minSalaries: 0,
           maxSalaries: 999,
           statuts: [],
-          showOnlyWithEmail: false
+          showOnlyWithEmail: false,
+          contactStatuts: []
         })}
         className="w-full touch-button bg-gray-100 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-200 transition-colors duration-200 text-sm font-medium"
       >

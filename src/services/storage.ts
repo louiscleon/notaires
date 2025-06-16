@@ -1,4 +1,4 @@
-import { Filtres, NotaireStatut } from '../types';
+import { Filtres, NotaireStatut, ContactStatut } from '../types';
 
 const FILTRES_KEY = 'notaires-filtres';
 
@@ -15,7 +15,9 @@ const getDefaultFiltres = (): Filtres => ({
   maxSalaries: 100,
   statuts: [] as NotaireStatut[],
   villesInteret: [],
-  showOnlyInRadius: false
+  showOnlyInRadius: false,
+  showOnlyWithEmail: false,
+  contactStatuts: [] as ContactStatut[]
 });
 
 const loadData = (): StorageData => {

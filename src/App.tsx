@@ -203,6 +203,18 @@ const App: React.FC = () => {
       // Filtre par email
       if (filtres.showOnlyWithEmail && !notaire.email) return false;
 
+      // Filtre par statut de contact
+      if (filtres.contactStatuts?.length > 0) {
+        // Si le notaire n'a pas de contacts, il est considéré comme "non_contacte"
+        if (!notaire.contacts || notaire.contacts.length === 0) {
+          if (!filtres.contactStatuts.includes('non_contacte')) return false;
+        } else {
+          // Prendre le statut du dernier contact
+          const dernierContact = notaire.contacts[notaire.contacts.length - 1];
+          if (!filtres.contactStatuts.includes(dernierContact.statut)) return false;
+        }
+      }
+
       // Filtre par rayon des villes d'intérêt
       if (filtres.showOnlyInRadius && filtres.villesInteret.length > 0) {
         // Vérifier si le notaire a des coordonnées

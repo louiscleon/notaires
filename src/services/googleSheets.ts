@@ -140,6 +140,8 @@ interface APIResponse<T> {
   data: T;
 }
 
+const API_URL = '/api';
+
 async function fetchWithError<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, options);
   let data;
@@ -183,34 +185,52 @@ export async function testConfig() {
   }
 }
 
-export async function readSheetData(range: string) {
+async function readSheetData(range: string): Promise<any[][]> {
   try {
-    console.log('Reading sheet data:', { range });
-    const apiUrl = '/api/sheets';
-    console.log('API URL:', apiUrl);
-    
-    const response = await fetch(`${apiUrl}?range=${encodeURIComponent(range)}`);
+    const url = `${API_URL}/sheets?range=${encodeURIComponent(range)}`;
+    console.log('Fetching data from:', url);
+
+    const response = await fetch(url);
     console.log('Response status:', response.status);
-    
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      console.error('API Error Response:', errorText);
+      throw new Error(`API error: ${response.status} ${response.statusText}\n${errorText}`);
     }
 
+    // Vérifier le type de contenu
     const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      throw new Error(`Invalid content type: ${contentType}`);
+    console.log('Response content-type:', contentType);
+
+    // Lire le texte brut d'abord
+    const rawText = await response.text();
+    console.log('Raw API response:', rawText);
+
+    // Essayer de parser le JSON
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseError: any) {
+      console.error('JSON Parse Error:', parseError);
+      console.error('Failed to parse response:', rawText);
+      throw new Error(`Failed to parse API response: ${parseError.message}`);
     }
 
-    const data = await response.json();
-    console.log('API response:', data);
-
-    if (!data || !Array.isArray(data.data)) {
-      console.error('Invalid response format:', data);
-      throw new Error('Invalid response format: data should be an array');
+    // Vérifier la structure de la réponse
+    if (!data || !data.data) {
+      console.error('Invalid API response structure:', data);
+      throw new Error('Invalid API response structure: missing data property');
     }
 
-    console.log('Sheet data received:', {
-      hasData: data.data.length > 0,
+    // Vérifier que data.data est un tableau
+    if (!Array.isArray(data.data)) {
+      console.error('Invalid data format:', data.data);
+      throw new Error('Invalid data format: expected array');
+    }
+
+    console.log('Successfully parsed data:', {
       rowCount: data.data.length,
       firstRow: data.data[0],
       lastRow: data.data[data.data.length - 1]
@@ -218,7 +238,7 @@ export async function readSheetData(range: string) {
 
     return data.data;
   } catch (error) {
-    console.error('Erreur lors de la lecture des données:', error);
+    console.error('Error in readSheetData:', error);
     throw error;
   }
 }

@@ -78,6 +78,7 @@ export interface Filtres {
   maxSalaries: number;
   statuts: NotaireStatut[];
   showOnlyWithEmail: boolean;
+  contactStatuts: ContactStatut[];
 }
 
 export interface GeocodingResult {
@@ -121,11 +122,4 @@ export interface AdresseSuggestion {
     lat: number;
     lng: number;
   };
-}
-
-declare global {
-  interface Window {
-    gapi: any;
-    google: any;
-  }
 } 
