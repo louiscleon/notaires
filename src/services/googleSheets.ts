@@ -82,29 +82,44 @@ export const googleSheetsService = {
     try {
       const notaires = Array.isArray(notaire) ? notaire : [notaire];
 
-      // Convertir les notaires en tableau de valeurs pour Google Sheets
-      const values = notaires.map(notaire => [
-        notaire.id,
-        notaire.officeNotarial,
-        notaire.adresse,
-        notaire.codePostal,
-        notaire.ville,
-        notaire.departement,
-        notaire.email,
-        notaire.notairesAssocies,
-        notaire.notairesSalaries,
-        notaire.nbAssocies,
-        notaire.nbSalaries,
-        notaire.serviceNego ? 'oui' : 'non',
-        notaire.statut,
-        notaire.notes,
-        JSON.stringify(notaire.contacts),
-        notaire.dateModification,
-        notaire.latitude,
-        notaire.longitude,
-        notaire.geoScore,
-        JSON.stringify(notaire.geocodingHistory)
-      ]);
+      // D'abord, charger tous les notaires existants
+      const responseNotaires = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.NOTAIRES}`);
+      const dataNotaires = await parseJsonResponse(responseNotaires);
+      if (!Array.isArray(dataNotaires)) {
+        throw new Error('Invalid API response format for notaires');
+      }
+
+      // Créer une map des notaires existants
+      const existingNotaires = new Map(dataNotaires.map(row => [row[0], row]));
+
+      // Mettre à jour ou ajouter les nouveaux notaires
+      notaires.forEach(notaire => {
+        existingNotaires.set(notaire.id, [
+          notaire.id,
+          notaire.officeNotarial,
+          notaire.adresse,
+          notaire.codePostal,
+          notaire.ville,
+          notaire.departement,
+          notaire.email,
+          notaire.notairesAssocies,
+          notaire.notairesSalaries,
+          notaire.nbAssocies,
+          notaire.nbSalaries,
+          notaire.serviceNego ? 'oui' : 'non',
+          notaire.statut,
+          notaire.notes,
+          JSON.stringify(notaire.contacts),
+          notaire.dateModification,
+          notaire.latitude,
+          notaire.longitude,
+          notaire.geoScore,
+          JSON.stringify(notaire.geocodingHistory)
+        ]);
+      });
+
+      // Convertir la map en tableau pour l'envoi
+      const values = Array.from(existingNotaires.values());
 
       const response = await fetchWithCors(`${API_BASE_URL}/sheets`, {
         method: 'POST',
@@ -116,6 +131,7 @@ export const googleSheetsService = {
 
       const data = await parseJsonResponse(response);
     } catch (error) {
+      console.error('Erreur lors de la sauvegarde dans Google Sheets:', error);
       throw error;
     }
   },

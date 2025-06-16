@@ -173,9 +173,39 @@ const App: React.FC = () => {
     checkConfig();
   }, []);
 
-  const handleStatutChange = (notaire: Notaire, newStatut: NotaireStatut) => {
-    const updatedNotaire = { ...notaire, statut: newStatut, dateModification: new Date().toISOString() };
-    setNotaires(notaires.map(n => n.id === notaire.id ? updatedNotaire : n));
+  const handleNotaireUpdate = async (updatedNotaire: Notaire) => {
+    try {
+      // Mettre à jour l'état local immédiatement pour une meilleure UX
+      setNotaires(prevNotaires => 
+        prevNotaires.map(n => n.id === updatedNotaire.id ? updatedNotaire : n)
+      );
+
+      // Sauvegarder dans Google Sheets
+      await googleSheetsService.saveToSheet(updatedNotaire);
+
+      // Recharger les données depuis Google Sheets pour s'assurer que tout est synchronisé
+      const response = await googleSheetsService.loadFromSheet();
+      setNotaires(response.notaires);
+
+      addToast('Modifications sauvegardées avec succès', 'success');
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour:', error);
+      addToast(
+        error instanceof Error 
+          ? `Erreur lors de la sauvegarde : ${error.message}`
+          : 'Erreur lors de la sauvegarde',
+        'error'
+      );
+    }
+  };
+
+  const handleStatutChange = async (notaire: Notaire, newStatut: NotaireStatut) => {
+    const updatedNotaire = { 
+      ...notaire, 
+      statut: newStatut, 
+      dateModification: new Date().toISOString() 
+    };
+    await handleNotaireUpdate(updatedNotaire);
   };
 
   const notairesFiltres = useMemo(() => {
@@ -274,12 +304,6 @@ const App: React.FC = () => {
 
   const handleCloseModal = () => {
     setSelectedNotaire(null);
-  };
-
-  const handleNotaireUpdate = (updatedNotaire: Notaire) => {
-    const newNotaires = notaires.map(n => n.id === updatedNotaire.id ? updatedNotaire : n);
-    setNotaires(newNotaires);
-    // La synchronisation sera faite automatiquement par le composant qui a fait la mise à jour
   };
 
   const handleFiltresChange = (newFiltres: Filtres) => {

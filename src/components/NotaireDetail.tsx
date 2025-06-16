@@ -102,9 +102,6 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
           dateModification: new Date().toISOString()
         };
         
-        // Sauvegarder dans Google Sheets
-        await googleSheetsService.saveToSheet(updatedNotaire);
-        
         onUpdate(updatedNotaire);
         setGeocodingStatus('Géocodage réussi !');
         setIsEditing(false);
@@ -113,20 +110,13 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
         return;
       }
     } else {
-      // Sauvegarder dans Google Sheets même si pas de changement d'adresse
       const updatedNotaire = {
         ...editedNotaire,
         dateModification: new Date().toISOString()
       };
       
-      try {
-        await googleSheetsService.saveToSheet(updatedNotaire);
-        onUpdate(updatedNotaire);
-        setIsEditing(false);
-      } catch (error) {
-        console.error('Erreur lors de la sauvegarde:', error);
-        setGeocodingStatus('Erreur lors de la sauvegarde');
-      }
+      onUpdate(updatedNotaire);
+      setIsEditing(false);
     }
   };
 
@@ -161,21 +151,13 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
       dateModification: new Date().toISOString()
     };
 
-    // Sauvegarder dans Google Sheets
-    googleSheetsService.saveToSheet(updatedNotaire)
-      .then(() => {
-        onUpdate(updatedNotaire);
-        setShowContactForm(false);
-        setNewContact({
-          type: 'initial',
-          par: 'Fanny',
-          statut: 'mail_envoye'
-        });
-      })
-      .catch(error => {
-        console.error('Erreur lors de la sauvegarde du contact:', error);
-        setGeocodingStatus('Erreur lors de la sauvegarde du contact');
-      });
+    onUpdate(updatedNotaire);
+    setShowContactForm(false);
+    setNewContact({
+      type: 'initial',
+      par: 'Fanny',
+      statut: 'mail_envoye'
+    });
   };
 
   const handleUpdateContact = (index: number, updates: Partial<Contact>) => {
@@ -205,15 +187,7 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
       dateModification: new Date().toISOString()
     };
 
-    // Sauvegarder dans Google Sheets
-    googleSheetsService.saveToSheet(updatedNotaire)
-      .then(() => {
-        onUpdate(updatedNotaire);
-      })
-      .catch(error => {
-        console.error('Erreur lors de la mise à jour du contact:', error);
-        setGeocodingStatus('Erreur lors de la mise à jour du contact');
-      });
+    onUpdate(updatedNotaire);
   };
 
   if (!isOpen) return null;
