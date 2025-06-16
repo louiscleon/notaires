@@ -200,6 +200,9 @@ const App: React.FC = () => {
       // Filtre par statut
       if (filtres.statuts.length > 0 && !filtres.statuts.includes(notaire.statut)) return false;
 
+      // Filtre par email
+      if (filtres.showOnlyWithEmail && !notaire.email) return false;
+
       // Filtre par rayon des villes d'intérêt
       if (filtres.showOnlyInRadius && filtres.villesInteret.length > 0) {
         // Vérifier si le notaire a des coordonnées

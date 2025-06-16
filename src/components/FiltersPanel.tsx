@@ -583,6 +583,20 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
                 icon="👤"
               />
             </div>
+            <div className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                checked={filtres.showOnlyWithEmail}
+                onChange={(e) => onFiltresChange({
+                  ...filtres,
+                  showOnlyWithEmail: e.target.checked
+                })}
+                className="h-5 w-5 text-teal-600 focus:ring-teal-500 border-gray-300 rounded touch-checkbox"
+              />
+              <label className="text-sm text-gray-700 touch-label">
+                Afficher uniquement les offices avec email
+              </label>
+            </div>
           </div>
         )}
       </div>
@@ -638,7 +652,8 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
           maxAssocies: 999,
           minSalaries: 0,
           maxSalaries: 999,
-          statuts: []
+          statuts: [],
+          showOnlyWithEmail: false
         })}
         className="w-full touch-button bg-gray-100 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-200 transition-colors duration-200 text-sm font-medium"
       >

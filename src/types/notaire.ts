@@ -1,3 +1,5 @@
+import { VilleInteret } from './index';
+
 export interface Notaire {
   id: string;
   officeNotarial: string;
@@ -25,15 +27,6 @@ export interface Notaire {
   latitude?: number;
   longitude?: number;
   geoStatus?: 'pending' | 'success' | 'error';
-}
-
-export interface VilleInteret {
-  id: string;
-  nom: string;
-  rayon: number; // en km
-  latitude?: number;
-  longitude?: number;
-  couleur?: string;
 }
 
 export interface Filtres {

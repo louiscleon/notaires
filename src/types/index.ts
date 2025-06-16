@@ -63,7 +63,7 @@ export interface VilleInteret {
   rayon: number;
   latitude: number;
   longitude: number;
-  departement?: string;
+  departement: string;
   population?: number;
 }
 
@@ -77,6 +77,7 @@ export interface Filtres {
   minSalaries: number;
   maxSalaries: number;
   statuts: NotaireStatut[];
+  showOnlyWithEmail: boolean;
 }
 
 export interface GeocodingResult {
