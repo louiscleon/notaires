@@ -102,8 +102,8 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   const [geocodingStatus, setGeocodingStatus] = useState<string>('');
   const [adresseSuggestions, setAdresseSuggestions] = useState<AdresseSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const hasUnsavedChanges = useRef(false);
 
   useEffect(() => {
     // Vérifier que le notaire a un ID valide lors des mises à jour
@@ -129,6 +129,14 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     return () => clearTimeout(timeoutId);
   }, [editedNotaire.adresse]);
 
+  // Sauvegarder les modifications non enregistrées à la fermeture
+  useEffect(() => {
+    if (!isOpen && hasUnsavedChanges.current) {
+      saveAndSync(editedNotaire);
+      hasUnsavedChanges.current = false;
+    }
+  }, [isOpen]);
+
   const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
@@ -142,19 +150,14 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     const updatedNotaire = {
       ...editedNotaire,
       [name]: value,
-      id: editedNotaire.id // Forcer l'ID à être conservé
+      id: editedNotaire.id,
+      dateModification: new Date().toISOString()
     };
     setEditedNotaire(updatedNotaire);
+    hasUnsavedChanges.current = true;
 
-    // Annuler le timeout précédent s'il existe
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    // Créer un nouveau timeout pour sauvegarder
-    saveTimeoutRef.current = setTimeout(async () => {
-      await saveAndSync(updatedNotaire);
-    }, 500);
+    // Sauvegarder immédiatement
+    await saveAndSync(updatedNotaire);
 
     if (name === 'adresse') {
       setShowSuggestions(true);
@@ -177,7 +180,8 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       codePostal: suggestion.postcode,
       ville: suggestion.city,
       latitude: suggestion.coordinates.lat,
-      longitude: suggestion.coordinates.lng
+      longitude: suggestion.coordinates.lng,
+      dateModification: new Date().toISOString()
     };
 
     try {
@@ -208,7 +212,8 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     const updatedNotaire = {
       ...editedNotaire,
       id: editedNotaire.id,
-      [name]: checked
+      [name]: checked,
+      dateModification: new Date().toISOString()
     };
     setEditedNotaire(updatedNotaire);
     await saveAndSync(updatedNotaire);
@@ -224,7 +229,8 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     const updatedNotaire = {
       ...editedNotaire,
       id: editedNotaire.id,
-      statut: value
+      statut: value,
+      dateModification: new Date().toISOString()
     };
     setEditedNotaire(updatedNotaire);
     await saveAndSync(updatedNotaire);
@@ -235,23 +241,25 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       setSaveError(null);
       onSave(updatedNotaire);
       await googleSheetsService.saveToSheet(updatedNotaire);
+      hasUnsavedChanges.current = false;
     } catch (error) {
       console.error('Erreur lors de la synchronisation avec Google Sheets:', error);
       setSaveError('Erreur lors de la sauvegarde. Les modifications seront perdues au rechargement de la page.');
+      hasUnsavedChanges.current = true;
     }
   };
 
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, []);
+  const handleClose = async () => {
+    // Sauvegarder les modifications non enregistrées avant de fermer
+    if (hasUnsavedChanges.current) {
+      await saveAndSync(editedNotaire);
+    }
+    onClose();
+  };
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
+      <Dialog as="div" className="relative z-50" onClose={handleClose}>
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-300"
@@ -282,7 +290,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                       {notaire.officeNotarial}
                     </Dialog.Title>
                     <button
-                      onClick={onClose}
+                      onClick={handleClose}
                       className="text-white hover:text-gray-200 transition-colors duration-200"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
