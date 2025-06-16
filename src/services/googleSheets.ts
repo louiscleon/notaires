@@ -97,8 +97,23 @@ function parseNotaire(row: any[]): Notaire {
   // Fonction utilitaire pour parser les nombres
   const parseNumber = (value: any): number | undefined => {
     if (value === undefined || value === null || value === '') return undefined;
-    const num = Number(String(value).trim().replace(/,/g, '.'));
+    // Gérer les cas où la valeur est une chaîne avec des virgules ou des points
+    const cleanValue = String(value).trim().replace(/,/g, '.');
+    const num = Number(cleanValue);
     return isNaN(num) ? undefined : num;
+  };
+
+  // Fonction utilitaire pour parser les coordonnées
+  const parseCoordinate = (value: any): number | undefined => {
+    const num = parseNumber(value);
+    // Vérifier que la coordonnée est dans une plage valide
+    if (num !== undefined) {
+      if (num >= -180 && num <= 180) {
+        return num;
+      }
+      console.warn(`Invalid coordinate value: ${value}, parsed as: ${num}`);
+    }
+    return undefined;
   };
 
   // Fonction utilitaire pour parser les dates
@@ -152,8 +167,8 @@ function parseNotaire(row: any[]): Notaire {
     telephone: telephone || '',
     email: email || '',
     siteWeb: siteWeb || '',
-    latitude: parseNumber(latitude),
-    longitude: parseNumber(longitude),
+    latitude: parseCoordinate(latitude),
+    longitude: parseCoordinate(longitude),
     statut: statut || 'nouveau',
     notes: notes || '',
     contacts: parseContacts(contacts),
@@ -166,6 +181,16 @@ function parseNotaire(row: any[]): Notaire {
     geoScore: parseNumber(geoScore),
     geocodingHistory: geocodingHistory ? JSON.parse(geocodingHistory) : []
   };
+
+  // Log des coordonnées pour debug
+  console.log('Notaire coordinates:', {
+    id: notaire.id,
+    office: notaire.officeNotarial,
+    rawLatitude: latitude,
+    rawLongitude: longitude,
+    parsedLatitude: notaire.latitude,
+    parsedLongitude: notaire.longitude
+  });
 
   console.log('Parsed notaire:', notaire);
   return notaire;
