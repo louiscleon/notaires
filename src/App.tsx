@@ -454,11 +454,13 @@ const App: React.FC = () => {
       {selectedNotaire && (
         <div className="fixed inset-0 z-[60] overflow-y-auto">
           <div className="flex min-h-screen items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <NotaireDetail
+            <NotaireModal
+              isOpen={true}
               notaire={selectedNotaire}
-              isOpen={!!selectedNotaire}
-              onClose={() => setSelectedNotaire(null)}
-              onUpdate={handleNotaireUpdate}
+              onClose={handleCloseModal}
+              onSave={handleNotaireUpdate}
+              isEditing={isEditing}
+              setIsEditing={setIsEditing}
             />
           </div>
         </div>

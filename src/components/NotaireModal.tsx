@@ -227,15 +227,18 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   const saveAndSync = async (updatedNotaire: Notaire) => {
     try {
       setSaveError(null);
-      // Sauvegarder d'abord dans Google Sheets
-      await googleSheetsService.saveToSheet(updatedNotaire);
-      // Puis mettre à jour l'état local
-      onSave(updatedNotaire);
+      // Utiliser la fonction onSave qui va gérer la sauvegarde et le rechargement
+      await onSave(updatedNotaire);
     } catch (error) {
       console.error('Erreur lors de la synchronisation avec Google Sheets:', error);
       setSaveError('Erreur lors de la sauvegarde. Les modifications seront perdues au rechargement de la page.');
     }
   };
+
+  // Mettre à jour l'état local quand le notaire change
+  useEffect(() => {
+    setEditedNotaire(notaire);
+  }, [notaire]);
 
   useEffect(() => {
     return () => {
