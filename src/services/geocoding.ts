@@ -88,10 +88,20 @@ export class GeocodingService {
         )
       );
 
+      console.log('Réponse de l\'API de géocodage:', response.data);
+
       if (response.data.features && response.data.features.length > 0) {
         const feature = response.data.features[0];
         const [lon, lat] = feature.geometry.coordinates;
         const score = feature.properties.score;
+
+        console.log('Résultat du géocodage:', {
+          address,
+          lat,
+          lon,
+          score,
+          label: feature.properties.label
+        });
 
         // Vérifier si le score est suffisant (0.6 est un bon seuil pour les adresses précises)
         if (score < 0.6) {
@@ -115,6 +125,7 @@ export class GeocodingService {
         return result;
       }
 
+      console.warn('Aucun résultat trouvé pour l\'adresse:', address);
       return {
         lat: 0,
         lon: 0,

@@ -232,6 +232,11 @@ const MapComponent: React.FC<Props> = ({
     const notairesMap = new Map(filteredNotaires.map(n => [n.id, n]));
     notairesRef.current = notairesMap;
 
+    console.log('Total notaires reçus:', filteredNotaires.length);
+    console.log('Notaires avec coordonnées:', filteredNotaires.filter(n => n.latitude && n.longitude).length);
+    console.log('Notaires sans coordonnées:', filteredNotaires.filter(n => !n.latitude || !n.longitude).length);
+    console.log('Notaires nécessitant un géocodage:', filteredNotaires.filter(n => n.needsGeocoding).length);
+
     // Filtrer les notaires qui ont déjà des coordonnées valides
     let notairesValides = filteredNotaires.filter(n =>
       typeof n.latitude === 'number' &&
@@ -240,87 +245,41 @@ const MapComponent: React.FC<Props> = ({
       !isNaN(n.longitude)
     );
     
+    console.log('Notaires valides après filtrage:', notairesValides.length);
+    console.log('Exemple de notaire valide:', notairesValides[0]);
+    
     // Si showOnlyInRadius est activé, filtrer les notaires dans les rayons
     if (showOnlyInRadius) {
       notairesValides = notairesValides.filter(notaire => 
         isNotaireInRadius(notaire, villesInteret)
       );
+      console.log('Notaires dans les rayons:', notairesValides.length);
     }
     
-    console.log(`Affichage de ${notairesValides.length} notaires avec coordonnées`);
     setNotairesAvecCoordonnees(notairesValides);
 
-    // Identifier les notaires qui ont besoin d'être géocodés
-    const notairesAGeocoder = filteredNotaires.filter(n => {
-      // Si le notaire a déjà des coordonnées, on ne le géocode pas
-      if (n.latitude && n.longitude) {
-        return false;
-      }
-      
-      // Si on a déjà fait le géocodage initial, on ne géocode que les notaires
-      // qui n'ont jamais été géocodés ou dont l'adresse a changé
-      if (initialGeocodingDone.current) {
-        const existingNotaire = notairesRef.current.get(n.id);
-        if (!existingNotaire) return true;
-        return existingNotaire.adresse !== n.adresse ||
-               existingNotaire.codePostal !== n.codePostal ||
-               existingNotaire.ville !== n.ville;
-      }
-      
-      // Sinon, on géocode tous les notaires sans coordonnées
-      return true;
-    });
-
-    const geocodeNotaires = async () => {
-      if (notairesAGeocoder.length === 0) {
-        console.log('Aucun nouveau notaire à géocoder');
-        return;
-      }
-
-      if (geocodingRef.current) {
-        console.log('Géocodage déjà en cours, ignoré');
-        return;
-      }
-
-      console.log(`Géocodage de ${notairesAGeocoder.length} notaires...`);
-      setLoading(true);
-      geocodingRef.current = true;
-      updatedNotairesRef.current.clear();
-
-      try {
-        await geocodeBatch(notairesAGeocoder, (updatedNotaire) => {
-          console.log(`Notaire géocodé: ${updatedNotaire.officeNotarial}`);
-          if (updatedNotaire.latitude && updatedNotaire.longitude) {
-            // Mettre à jour la référence et l'état
-            notairesRef.current.set(updatedNotaire.id, updatedNotaire);
-            updatedNotairesRef.current.add(updatedNotaire);
-            setNotairesAvecCoordonnees(prev => {
-              const newNotaires = new Map(prev.map(n => [n.id, n]));
-              newNotaires.set(updatedNotaire.id, updatedNotaire);
-              return Array.from(newNotaires.values());
-            });
-          }
-        });
-        
-        // Notifier le parent une seule fois avec tous les notaires mis à jour
-        if (updatedNotairesRef.current.size > 0) {
-          const updatedNotaires = Array.from(updatedNotairesRef.current);
-          console.log(`Notification de ${updatedNotaires.length} notaires mis à jour`);
-          onNotaireUpdate?.(updatedNotaires[0]); // On n'envoie que le premier pour déclencher une seule synchronisation
+    // Gérer le géocodage des notaires qui en ont besoin
+    const notairesAGeocoder = filteredNotaires.filter(n => n.needsGeocoding);
+    if (notairesAGeocoder.length > 0) {
+      console.log('Géocodage de', notairesAGeocoder.length, 'notaires');
+      geocodeBatch(notairesAGeocoder, (notaireGeocode) => {
+        // Mettre à jour le notaire dans la carte
+        const updatedNotaires = [...notairesAvecCoordonnees];
+        const index = updatedNotaires.findIndex(n => n.id === notaireGeocode.id);
+        if (index !== -1) {
+          updatedNotaires[index] = notaireGeocode;
+        } else {
+          updatedNotaires.push(notaireGeocode);
         }
-        
-        initialGeocodingDone.current = true;
-      } catch (error) {
-        console.error('Erreur lors du géocodage:', error);
-      } finally {
-        geocodingRef.current = false;
-        setLoading(false);
-        updatedNotairesRef.current.clear();
-      }
-    };
+        setNotairesAvecCoordonnees(updatedNotaires);
 
-    geocodeNotaires();
-  }, [filteredNotaires, onNotaireUpdate, showOnlyInRadius, villesInteret, isNotaireInRadius]);
+        // Notifier le parent du changement
+        if (onNotaireUpdate) {
+          onNotaireUpdate(notaireGeocode);
+        }
+      });
+    }
+  }, [filteredNotaires, showOnlyInRadius, villesInteret, onNotaireUpdate]);
 
   // Log temporaire pour debug
   useEffect(() => {

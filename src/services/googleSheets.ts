@@ -30,6 +30,7 @@ interface Notaire {
   geoStatus?: 'pending' | 'success' | 'error';
   display_name?: string;
   geocodingHistory?: GeocodingHistory[];
+  needsGeocoding: boolean;
 }
 
 interface VilleInteret {
@@ -66,53 +67,51 @@ function parseNotaire(row: any[]): Notaire {
     notairesAssocies,
     notairesSalaries,
     geoScore,
-    geocodingHistory
+    geocodingHistory,
+    needsGeocoding
   ] = row;
 
-  console.log('Raw values:', {
-    id,
-    officeNotarial,
-    adresse,
-    codePostal,
-    ville,
-    departement,
-    telephone,
-    email,
-    siteWeb,
-    latitude,
-    longitude,
-    statut,
-    notes,
-    contacts,
-    dateModification,
-    nbAssocies,
-    nbSalaries,
-    serviceNego,
-    notairesAssocies,
-    notairesSalaries,
-    geoScore,
-    geocodingHistory
-  });
+  // Construire l'adresse complète pour la comparaison
+  const adresseComplete = `${adresse}, ${codePostal} ${ville}`.toLowerCase().trim();
+  
+  // Vérifier si l'adresse a changé en comparant avec l'historique de géocodage
+  const adresseAChange = !geocodingHistory || geocodingHistory.length === 0 || 
+    geocodingHistory[geocodingHistory.length - 1].address.toLowerCase().trim() !== adresseComplete;
+
+  console.log('Adresse complète:', adresseComplete);
+  console.log('Adresse a changé:', adresseAChange);
+
+  // Si l'adresse a changé, on réinitialise les coordonnées
+  const shouldResetCoordinates = adresseAChange;
 
   // Fonction utilitaire pour parser les nombres
   const parseNumber = (value: any): number | undefined => {
-    if (value === undefined || value === null || value === '') return undefined;
+    console.log('Parsing number value:', value, 'type:', typeof value);
+    if (value === undefined || value === null || value === '') {
+      console.log('Empty value, returning undefined');
+      return undefined;
+    }
     // Gérer les cas où la valeur est une chaîne avec des virgules ou des points
     const cleanValue = String(value).trim().replace(/,/g, '.');
+    console.log('Cleaned value:', cleanValue);
     const num = Number(cleanValue);
+    console.log('Parsed number:', num, 'isNaN:', isNaN(num));
     return isNaN(num) ? undefined : num;
   };
 
   // Fonction utilitaire pour parser les coordonnées
   const parseCoordinate = (value: any): number | undefined => {
+    console.log('Parsing coordinate:', value, 'type:', typeof value);
     const num = parseNumber(value);
     // Vérifier que la coordonnée est dans une plage valide
     if (num !== undefined) {
       if (num >= -180 && num <= 180) {
+        console.log('Valid coordinate:', num);
         return num;
       }
       console.warn(`Invalid coordinate value: ${value}, parsed as: ${num}`);
     }
+    console.log('Returning undefined for coordinate');
     return undefined;
   };
 
@@ -167,8 +166,9 @@ function parseNotaire(row: any[]): Notaire {
     telephone: telephone || '',
     email: email || '',
     siteWeb: siteWeb || '',
-    latitude: parseCoordinate(latitude),
-    longitude: parseCoordinate(longitude),
+    // Si l'adresse a changé, on réinitialise les coordonnées
+    latitude: shouldResetCoordinates ? undefined : parseCoordinate(latitude),
+    longitude: shouldResetCoordinates ? undefined : parseCoordinate(longitude),
     statut: statut || 'nouveau',
     notes: notes || '',
     contacts: parseContacts(contacts),
@@ -179,7 +179,9 @@ function parseNotaire(row: any[]): Notaire {
     notairesAssocies: notairesAssocies || '',
     notairesSalaries: notairesSalaries || '',
     geoScore: parseNumber(geoScore),
-    geocodingHistory: geocodingHistory ? JSON.parse(geocodingHistory) : []
+    geocodingHistory: geocodingHistory ? JSON.parse(geocodingHistory) : [],
+    // Utiliser la valeur stockée ou déterminer si le géocodage est nécessaire
+    needsGeocoding: needsGeocoding === 'true' || shouldResetCoordinates
   };
 
   // Log des coordonnées pour debug
@@ -189,7 +191,8 @@ function parseNotaire(row: any[]): Notaire {
     rawLatitude: latitude,
     rawLongitude: longitude,
     parsedLatitude: notaire.latitude,
-    parsedLongitude: notaire.longitude
+    parsedLongitude: notaire.longitude,
+    needsGeocoding: notaire.needsGeocoding
   });
 
   console.log('Parsed notaire:', notaire);
@@ -282,58 +285,21 @@ export async function testConfig() {
 
 async function readSheetData(range: string): Promise<any[][]> {
   try {
-    const url = `${API_URL}/sheets?range=${encodeURIComponent(range)}`;
-    console.log('Fetching data from:', url);
-
-    const response = await fetch(url);
-    console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API Error Response:', errorText);
-      throw new Error(`API error: ${response.status} ${response.statusText}\n${errorText}`);
+    console.log('Reading sheet data for range:', range);
+    const response = await fetchWithError<APIResponse<any[][]>>(`${API_URL}/sheets?range=${encodeURIComponent(range)}`);
+    console.log('Sheet data response:', response);
+    
+    if (!response.data) {
+      console.error('No data in response');
+      throw new Error('No data received from API');
     }
-
-    // Vérifier le type de contenu
-    const contentType = response.headers.get('content-type');
-    console.log('Response content-type:', contentType);
-
-    // Lire le texte brut d'abord
-    const rawText = await response.text();
-    console.log('Raw API response:', rawText);
-
-    // Essayer de parser le JSON
-    let data;
-    try {
-      data = JSON.parse(rawText);
-    } catch (parseError: any) {
-      console.error('JSON Parse Error:', parseError);
-      console.error('Failed to parse response:', rawText);
-      throw new Error(`Failed to parse API response: ${parseError.message}`);
-    }
-
-    // Vérifier la structure de la réponse
-    if (!data || !data.data) {
-      console.error('Invalid API response structure:', data);
-      throw new Error('Invalid API response structure: missing data property');
-    }
-
-    // Vérifier que data.data est un tableau
-    if (!Array.isArray(data.data)) {
-      console.error('Invalid data format:', data.data);
-      throw new Error('Invalid data format: expected array');
-    }
-
-    console.log('Successfully parsed data:', {
-      rowCount: data.data.length,
-      firstRow: data.data[0],
-      lastRow: data.data[data.data.length - 1]
-    });
-
-    return data.data;
+    
+    console.log('Sheet data rows:', response.data.length);
+    console.log('First row:', response.data[0]);
+    
+    return response.data;
   } catch (error) {
-    console.error('Error in readSheetData:', error);
+    console.error('Error reading sheet data:', error);
     throw error;
   }
 }
@@ -362,112 +328,99 @@ export async function writeSheetData(range: string, values: any[][]) {
 export const googleSheetsService = {
   async loadFromSheet(): Promise<SheetData> {
     try {
-      console.log('Loading data from sheets...');
-      
-      // Charger les notaires
-      const notairesRows = await readSheetData('Notaires!A2:T');
-      console.log('Notaires rows loaded:', notairesRows);
-      const notaires = (notairesRows || []).map(parseNotaire);
-      
-      // Charger les villes d'intérêt
-      let villesInteret: VilleInteret[] = [];
-      try {
-        const villesRows = await readSheetData('VillesInteret!A2:G');
-        console.log('Villes rows loaded:', villesRows);
-        villesInteret = (villesRows || []).map(parseVilleInteret);
-      } catch (error) {
-        console.error('Error loading villes interet:', error);
-        // En cas d'erreur, on continue avec un tableau vide
-        villesInteret = [];
-      }
+      console.log('Loading data from sheet');
+      const [notairesData, villesInteretData] = await Promise.all([
+        readSheetData('Notaires!A2:V'),
+        readSheetData('VillesInteret!A2:G')
+      ]);
 
-      console.log('Data loaded:', {
-        notairesCount: notaires.length,
-        villesCount: villesInteret.length,
-        sampleNotaire: notaires[0],
-        sampleVille: villesInteret[0]
-      });
+      console.log('Notaires data rows:', notairesData.length);
+      console.log('Villes interet data rows:', villesInteretData.length);
 
-      return {
-        notaires,
-        villesInteret
-      };
+      const notaires = notairesData.map(row => parseNotaire(row));
+      const villesInteret = villesInteretData.map(row => parseVilleInteret(row));
+
+      console.log('Parsed notaires:', notaires.length);
+      console.log('Parsed villes interet:', villesInteret.length);
+
+      return { notaires, villesInteret };
     } catch (error) {
-      console.error('Erreur lors du chargement:', error);
+      console.error('Error loading from sheet:', error);
       throw error;
     }
   },
 
   async saveToSheet(notaire: Notaire | Notaire[]): Promise<void> {
     try {
-      if (Array.isArray(notaire)) {
-        // Si c'est un tableau de notaires, sauvegarder tout
-        const values = notaire.map(n => [
-          n.id,
-          n.officeNotarial,
-          n.adresse,
-          n.codePostal,
-          n.ville,
-          n.departement,
-          n.email || '',
-          n.notairesAssocies || '',
-          n.notairesSalaries || '',
-          n.nbAssocies,
-          n.nbSalaries,
-          n.serviceNego ? 'oui' : 'non',
-          n.statut,
-          n.notes || '',
-          JSON.stringify(n.contacts || []),
-          n.dateModification || new Date().toISOString(),
-          n.latitude || '',
-          n.longitude || '',
-          n.geoScore || '',
-          JSON.stringify(n.geocodingHistory || [])
-        ]);
-        await writeSheetData('Notaires!A2:T', values);
-        console.log('Tous les notaires sauvegardés avec succès dans Google Sheets');
-      } else {
-        // Si c'est un seul notaire, trouver sa ligne et la mettre à jour
-        const row = [
-          notaire.id,
-          notaire.officeNotarial,
-          notaire.adresse,
-          notaire.codePostal,
-          notaire.ville,
-          notaire.departement,
-          notaire.email || '',
-          notaire.notairesAssocies || '',
-          notaire.notairesSalaries || '',
-          notaire.nbAssocies,
-          notaire.nbSalaries,
-          notaire.serviceNego ? 'oui' : 'non',
-          notaire.statut,
-          notaire.notes || '',
-          JSON.stringify(notaire.contacts || []),
-          notaire.dateModification || new Date().toISOString(),
-          notaire.latitude || '',
-          notaire.longitude || '',
-          notaire.geoScore || '',
-          JSON.stringify(notaire.geocodingHistory || [])
-        ];
+      const notaires = Array.isArray(notaire) ? notaire : [notaire];
+      console.log('Saving notaires to sheet:', notaires.length);
 
-        // Trouver l'index de la ligne correspondante dans la feuille
-        const allData = await this.loadFromSheet();
-        const notaireIndex = allData.notaires.findIndex(n => n.id === notaire.id);
-        
-        if (notaireIndex === -1) {
-          throw new Error(`Notaire avec l'ID ${notaire.id} non trouvé dans la feuille`);
+      // Préparer les données pour Google Sheets
+      const rows = notaires.map(n => [
+        n.id,
+        n.officeNotarial,
+        n.adresse,
+        n.codePostal,
+        n.ville,
+        n.departement,
+        n.telephone || '',
+        n.email || '',
+        n.siteWeb || '',
+        n.latitude || '',
+        n.longitude || '',
+        n.statut,
+        n.notes || '',
+        JSON.stringify(n.contacts),
+        n.dateModification,
+        n.nbAssocies,
+        n.nbSalaries,
+        n.serviceNego ? 'oui' : 'non',
+        n.notairesAssocies || '',
+        n.notairesSalaries || '',
+        n.geoScore || '',
+        JSON.stringify(n.geocodingHistory || []),
+        n.needsGeocoding || false // Assurer que needsGeocoding est toujours un booléen
+      ]);
+
+      // Trouver les lignes existantes
+      const existingData = await readSheetData('Notaires!A2:W');
+      const existingIds = new Set(existingData.map(row => row[0]));
+
+      // Séparer les nouvelles lignes et les mises à jour
+      const newRows: any[][] = [];
+      const updateRows: { range: string; values: any[][] }[] = [];
+
+      rows.forEach((row, index) => {
+        const id = row[0];
+        if (existingIds.has(id)) {
+          // Trouver l'index de la ligne existante
+          const existingIndex = existingData.findIndex(r => r[0] === id);
+          if (existingIndex !== -1) {
+            updateRows.push({
+              range: `Notaires!A${existingIndex + 2}:W${existingIndex + 2}`,
+              values: [row]
+            });
+          }
+        } else {
+          newRows.push(row);
         }
+      });
 
-        // Calculer la ligne réelle dans la feuille (ajouter 2 car la première ligne est l'en-tête)
-        const rowIndex = notaireIndex + 2;
-        
-        // Mettre à jour la ligne spécifique
-        await writeSheetData(`Notaires!A${rowIndex}:T${rowIndex}`, [row]);
-        console.log('Notaire sauvegardé avec succès dans Google Sheets');
+      // Ajouter les nouvelles lignes
+      if (newRows.length > 0) {
+        console.log('Adding new rows:', newRows.length);
+        await writeSheetData('Notaires!A2:W', newRows);
       }
+
+      // Mettre à jour les lignes existantes
+      for (const update of updateRows) {
+        console.log('Updating row:', update.range);
+        await writeSheetData(update.range, update.values);
+      }
+
+      console.log('Save completed successfully');
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde dans Google Sheets:', error);
+      console.error('Error saving to sheet:', error);
       throw error;
     }
   },

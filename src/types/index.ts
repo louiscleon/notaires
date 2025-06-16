@@ -55,6 +55,7 @@ export interface Notaire {
   geoStatus?: 'pending' | 'success' | 'error';
   display_name?: string;
   geocodingHistory?: GeocodingHistory[];
+  needsGeocoding?: boolean;
 }
 
 export interface VilleInteret {
