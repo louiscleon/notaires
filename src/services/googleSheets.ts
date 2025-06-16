@@ -184,34 +184,29 @@ export async function readSheetData(range: string) {
     
     const response = await fetch(`${apiUrl}?range=${encodeURIComponent(range)}`);
     console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
     
-    const text = await response.text();
-    console.log('Raw API response:', text);
-
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    let data;
-    try {
-      data = JSON.parse(text);
-      console.log('Parsed API response:', data);
-    } catch (parseError: any) {
-      console.error('Failed to parse JSON:', parseError);
-      throw new Error(`Failed to parse JSON: ${parseError.message}, raw response: ${text}`);
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error(`Invalid content type: ${contentType}`);
     }
 
-    if (!data || !data.data) {
+    const data = await response.json();
+    console.log('API response:', data);
+
+    if (!data || !Array.isArray(data.data)) {
       console.error('Invalid response format:', data);
-      throw new Error('Invalid response format: missing data property');
+      throw new Error('Invalid response format: data should be an array');
     }
 
     console.log('Sheet data received:', {
-      hasData: !!data.data,
-      rowCount: data.data?.length || 0,
-      firstRow: data.data?.[0],
-      lastRow: data.data?.[data.data.length - 1]
+      hasData: data.data.length > 0,
+      rowCount: data.data.length,
+      firstRow: data.data[0],
+      lastRow: data.data[data.data.length - 1]
     });
 
     return data.data;

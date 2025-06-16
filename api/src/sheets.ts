@@ -46,16 +46,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             range,
           });
 
+          // Ensure we have valid data
+          if (!response.data || !response.data.values) {
+            console.log('No data found in response:', response.data);
+            return res.status(200).json({
+              data: []
+            });
+          }
+
           const result = {
-            hasData: !!response.data.values,
-            rowCount: response.data.values?.length || 0,
-            firstRow: response.data.values?.[0],
-            lastRow: response.data.values?.[response.data.values.length - 1]
+            hasData: true,
+            rowCount: response.data.values.length,
+            firstRow: response.data.values[0],
+            lastRow: response.data.values[response.data.values.length - 1]
           };
           console.log('Data fetched:', safeStringify(result));
 
+          // Ensure we're sending a properly formatted JSON response
           return res.status(200).json({
-            data: response.data.values || []
+            data: response.data.values
           });
         } catch (e) {
           const error = e as Error;
