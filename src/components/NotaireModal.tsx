@@ -102,23 +102,18 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   const [geocodingStatus, setGeocodingStatus] = useState<string>('');
   const [adresseSuggestions, setAdresseSuggestions] = useState<AdresseSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Mettre à jour l'état local quand le notaire change
   useEffect(() => {
+    // Vérifier que le notaire a un ID valide lors des mises à jour
+    if (!notaire.id) {
+      console.error('Notaire sans ID reçu dans la mise à jour de NotaireModal');
+      setSaveError('Erreur : ID du notaire manquant');
+      return;
+    }
     setEditedNotaire(notaire);
   }, [notaire]);
-
-  // Nettoyer le timeout à la fermeture
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     const searchAdresses = async () => {
@@ -134,34 +129,21 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     return () => clearTimeout(timeoutId);
   }, [editedNotaire.adresse]);
 
-  const saveAndSync = async (updatedNotaire: Notaire) => {
-    if (isSaving) return;
-    setIsSaving(true);
-    setSaveError(null);
-
-    try {
-      await onSave(updatedNotaire);
-      await googleSheetsService.saveToSheet(updatedNotaire);
-      setEditedNotaire(updatedNotaire);
-    } catch (error) {
-      console.error('Erreur lors de la synchronisation avec Google Sheets:', error);
-      setSaveError('Erreur lors de la sauvegarde. Les modifications seront perdues au rechargement de la page.');
-      throw error;
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
+    // S'assurer que l'ID est toujours présent
+    if (!editedNotaire.id) {
+      console.error('ID du notaire manquant');
+      setSaveError('Erreur : ID du notaire manquant');
+      return;
+    }
+
     const updatedNotaire = {
       ...editedNotaire,
       [name]: value,
-      dateModification: new Date().toISOString()
+      id: editedNotaire.id // Forcer l'ID à être conservé
     };
-
-    // Mettre à jour l'état local immédiatement
     setEditedNotaire(updatedNotaire);
 
     // Annuler le timeout précédent s'il existe
@@ -169,14 +151,10 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       clearTimeout(saveTimeoutRef.current);
     }
 
-    // Créer un nouveau timeout pour la sauvegarde
+    // Créer un nouveau timeout pour sauvegarder
     saveTimeoutRef.current = setTimeout(async () => {
-      try {
-        await saveAndSync(updatedNotaire);
-      } catch (error) {
-        // L'erreur est déjà gérée dans saveAndSync
-      }
-    }, 1000); // Attendre 1 seconde après la dernière frappe
+      await saveAndSync(updatedNotaire);
+    }, 500);
 
     if (name === 'adresse') {
       setShowSuggestions(true);
@@ -184,16 +162,22 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   };
 
   const handleSelectAdresse = async (suggestion: AdresseSuggestion) => {
+    if (!editedNotaire.id) {
+      console.error('ID du notaire manquant');
+      setSaveError('Erreur : ID du notaire manquant');
+      return;
+    }
+
     setGeocodingStatus('Géocodage de la nouvelle adresse...');
     
     const updatedNotaire = {
       ...editedNotaire,
+      id: editedNotaire.id,
       adresse: suggestion.label,
       codePostal: suggestion.postcode,
       ville: suggestion.city,
       latitude: suggestion.coordinates.lat,
-      longitude: suggestion.coordinates.lng,
-      dateModification: new Date().toISOString()
+      longitude: suggestion.coordinates.lng
     };
 
     try {
@@ -208,66 +192,66 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     } catch (error) {
       console.error('Erreur lors du géocodage:', error);
       setGeocodingStatus('Erreur lors du géocodage de l\'adresse');
+      await saveAndSync(updatedNotaire);
     } finally {
       setShowSuggestions(false);
     }
   };
 
   const handleCheckboxChange = async (name: string, checked: boolean) => {
+    if (!editedNotaire.id) {
+      console.error('ID du notaire manquant');
+      setSaveError('Erreur : ID du notaire manquant');
+      return;
+    }
+
     const updatedNotaire = {
       ...editedNotaire,
-      [name]: checked,
-      dateModification: new Date().toISOString()
+      id: editedNotaire.id,
+      [name]: checked
     };
-
     setEditedNotaire(updatedNotaire);
-    try {
-      await saveAndSync(updatedNotaire);
-    } catch (error) {
-      // L'erreur est déjà gérée dans saveAndSync
-    }
+    await saveAndSync(updatedNotaire);
   };
 
   const handleStatusChange = async (value: NotaireStatut) => {
+    if (!editedNotaire.id) {
+      console.error('ID du notaire manquant');
+      setSaveError('Erreur : ID du notaire manquant');
+      return;
+    }
+
     const updatedNotaire = {
       ...editedNotaire,
-      statut: value,
-      dateModification: new Date().toISOString()
+      id: editedNotaire.id,
+      statut: value
     };
-
     setEditedNotaire(updatedNotaire);
+    await saveAndSync(updatedNotaire);
+  };
+
+  const saveAndSync = async (updatedNotaire: Notaire) => {
     try {
-      await saveAndSync(updatedNotaire);
+      setSaveError(null);
+      onSave(updatedNotaire);
+      await googleSheetsService.saveToSheet(updatedNotaire);
     } catch (error) {
-      // L'erreur est déjà gérée dans saveAndSync
+      console.error('Erreur lors de la synchronisation avec Google Sheets:', error);
+      setSaveError('Erreur lors de la sauvegarde. Les modifications seront perdues au rechargement de la page.');
     }
   };
 
-  const handleClose = () => {
-    // Sauvegarder les modifications en attente avant de fermer
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-      saveAndSync(editedNotaire).then(() => {
-        setSaveError(null);
-        onClose();
-      }).catch(() => {
-        setSaveError('Erreur lors de la sauvegarde finale. Voulez-vous réessayer ?');
-      });
-      return;
-    }
-
-    if (isSaving) {
-      setSaveError('Sauvegarde en cours, veuillez patienter...');
-      return;
-    }
-    
-    setSaveError(null);
-    onClose();
-  };
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={handleClose}>
+      <Dialog as="div" className="relative z-50" onClose={onClose}>
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-300"
@@ -298,7 +282,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                       {notaire.officeNotarial}
                     </Dialog.Title>
                     <button
-                      onClick={handleClose}
+                      onClick={onClose}
                       className="text-white hover:text-gray-200 transition-colors duration-200"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

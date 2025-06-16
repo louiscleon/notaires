@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Notaire, NotaireStatut, Contact, ContactStatut, AdresseSuggestion } from '../types';
 import { searchAdresse } from '../services/adresse';
 import { geocodeAddress } from '../services/geocoding';
-import { googleSheetsService } from '../services/googleSheets';
 
 interface NotaireDetailProps {
   notaire: Notaire;
@@ -55,7 +54,6 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
     par: 'Fanny',
     statut: 'mail_envoye'
   });
-  const hasUnsavedChanges = useRef(false);
 
   useEffect(() => {
     const searchAdresses = async () => {
@@ -71,36 +69,12 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
     return () => clearTimeout(timeoutId);
   }, [adresse]);
 
-  // Sauvegarder les modifications non enregistrées à la fermeture
-  useEffect(() => {
-    if (!isOpen && hasUnsavedChanges.current) {
-      saveAndSync(editedNotaire);
-      hasUnsavedChanges.current = false;
-    }
-  }, [isOpen]);
-
-  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    const updatedNotaire = {
-      ...editedNotaire,
+    setEditedNotaire((prev) => ({
+      ...prev,
       [name]: value,
-      dateModification: new Date().toISOString()
-    };
-    setEditedNotaire(updatedNotaire);
-    hasUnsavedChanges.current = true;
-    await saveAndSync(updatedNotaire);
-  };
-
-  const saveAndSync = async (updatedNotaire: Notaire) => {
-    try {
-      onUpdate(updatedNotaire);
-      await googleSheetsService.saveToSheet(updatedNotaire);
-      hasUnsavedChanges.current = false;
-    } catch (error) {
-      console.error('Erreur lors de la synchronisation avec Google Sheets:', error);
-      setGeocodingStatus('Erreur lors de la sauvegarde dans Google Sheets');
-      hasUnsavedChanges.current = true;
-    }
+    }));
   };
 
   const handleSave = async () => {
@@ -124,28 +98,22 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
           latitude: result.lat,
           longitude: result.lon,
           display_name: result.display_name,
-          dateModification: new Date().toISOString()
         };
         
-        await saveAndSync(updatedNotaire);
+        onUpdate(updatedNotaire);
         setGeocodingStatus('Géocodage réussi !');
         setIsEditing(false);
       } catch (error) {
-        console.error('Erreur lors du géocodage ou de la sauvegarde:', error);
-        setGeocodingStatus('Erreur lors du géocodage ou de la sauvegarde');
+        setGeocodingStatus('Erreur lors du géocodage');
         return;
       }
     } else {
-      const updatedNotaire = {
-        ...editedNotaire,
-        dateModification: new Date().toISOString()
-      };
-      await saveAndSync(updatedNotaire);
+      onUpdate(editedNotaire);
       setIsEditing(false);
     }
   };
 
-  const handleSelectAdresse = async (suggestion: AdresseSuggestion) => {
+  const handleSelectAdresse = (suggestion: AdresseSuggestion) => {
     setAdresse(suggestion.label);
     const updatedNotaire: Notaire = {
       ...notaire,
@@ -156,11 +124,11 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
       longitude: suggestion.coordinates.lng,
       dateModification: new Date().toISOString()
     };
-    await saveAndSync(updatedNotaire);
+    onUpdate(updatedNotaire);
     setAdresseSuggestions([]);
   };
 
-  const handleAddContact = async () => {
+  const handleAddContact = () => {
     if (!newContact.date) return;
 
     const contact: Contact = {
@@ -175,8 +143,7 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
       contacts: [...notaire.contacts, contact],
       dateModification: new Date().toISOString()
     };
-    
-    await saveAndSync(updatedNotaire);
+    onUpdate(updatedNotaire);
     setShowContactForm(false);
     setNewContact({
       type: 'initial',
@@ -185,10 +152,11 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
     });
   };
 
-  const handleUpdateContact = async (index: number, updates: Partial<Contact>) => {
+  const handleUpdateContact = (index: number, updates: Partial<Contact>) => {
     const updatedContacts = [...notaire.contacts];
     const currentContact = updatedContacts[index];
     
+    // Si on met à jour reponseRecue, s'assurer que tous les champs requis sont présents
     if (updates.reponseRecue) {
       const now = new Date().toISOString();
       const reponseRecue = {
@@ -205,27 +173,11 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
 
     updatedContacts[index] = { ...currentContact, ...updates };
 
-    const updatedNotaire = {
+    onUpdate({
       ...notaire,
       contacts: updatedContacts,
       dateModification: new Date().toISOString()
-    };
-
-    await saveAndSync(updatedNotaire);
-  };
-
-  const handleClose = async () => {
-    // Sauvegarder les modifications non enregistrées avant de fermer
-    if (hasUnsavedChanges.current) {
-      try {
-        await saveAndSync(editedNotaire);
-      } catch (error) {
-        console.error('Erreur lors de la sauvegarde finale:', error);
-        setGeocodingStatus('Erreur lors de la sauvegarde. Veuillez réessayer avant de fermer.');
-        return; // Ne pas fermer si la sauvegarde a échoué
-      }
-    }
-    onClose();
+    });
   };
 
   if (!isOpen) return null;
@@ -236,7 +188,7 @@ export const NotaireDetail: React.FC<NotaireDetailProps> = ({
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold">Détails du Notaire</h2>
           <button
-            onClick={handleClose}
+            onClick={onClose}
             className="text-gray-500 hover:text-gray-700"
           >
             ✕

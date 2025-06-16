@@ -69,67 +69,66 @@ const App: React.FC = () => {
   }, [filtres]);
 
   // Charger les données
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      
-      // Charger d'abord rapidement les données brutes depuis Google Sheets
-      console.log('Chargement initial des données...');
-      const response = await googleSheetsService.loadFromSheet();
-      
-      // Analyser les données chargées
-      console.log('Analyse des données chargées:', {
-        total: response.notaires.length,
-        parDepartement: response.notaires.reduce((acc, n) => {
-          const dept = n.departement?.trim().substring(0, 2) || 'inconnu';
-          acc[dept] = (acc[dept] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>)
-      });
-
-      // Vérifier les doublons potentiels
-      const officeMap = new Map<string, string[]>();
-      response.notaires.forEach(n => {
-        const key = `${n.officeNotarial}_${n.ville}`.toLowerCase();
-        if (!officeMap.has(key)) {
-          officeMap.set(key, []);
-        }
-        officeMap.get(key)?.push(n.id);
-      });
-
-      // Afficher les offices avec plusieurs IDs
-      officeMap.forEach((ids, office) => {
-        if (ids.length > 1) {
-          console.log('Office avec plusieurs entrées:', {
-            office,
-            ids,
-            notaires: ids.map(id => {
-              const n = response.notaires.find(n => n.id === id);
-              return {
-                id: n?.id,
-                office: n?.officeNotarial,
-                adresse: n?.adresse,
-                ville: n?.ville,
-                coords: n?.latitude && n?.longitude ? `${n.latitude},${n.longitude}` : 'pas de coordonnées'
-              };
-            })
-          });
-        }
-      });
-
-      console.log(`${response.notaires.length} notaires chargés depuis Google Sheets`);
-      setNotaires(response.notaires);
-      setError(null);
-    } catch (error) {
-      console.error('Erreur lors du chargement des données:', error);
-      setError('Erreur lors du chargement des données. Veuillez réessayer.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Charger les données au démarrage
   useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        
+        // Charger d'abord rapidement les données brutes depuis Google Sheets
+        console.log('Chargement initial des données...');
+        const response = await googleSheetsService.loadFromSheet();
+        
+        // Analyser les données chargées
+        console.log('Analyse des données chargées:', {
+          total: response.notaires.length,
+          parDepartement: response.notaires.reduce((acc, n) => {
+            const dept = n.departement?.trim().substring(0, 2) || 'inconnu';
+            acc[dept] = (acc[dept] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>)
+        });
+
+        // Vérifier les doublons potentiels
+        const officeMap = new Map<string, string[]>();
+        response.notaires.forEach(n => {
+          const key = `${n.officeNotarial}_${n.ville}`.toLowerCase();
+          if (!officeMap.has(key)) {
+            officeMap.set(key, []);
+          }
+          officeMap.get(key)?.push(n.id);
+        });
+
+        // Afficher les offices avec plusieurs IDs
+        officeMap.forEach((ids, office) => {
+          if (ids.length > 1) {
+            console.log('Office avec plusieurs entrées:', {
+              office,
+              ids,
+              notaires: ids.map(id => {
+                const n = response.notaires.find(n => n.id === id);
+                return {
+                  id: n?.id,
+                  office: n?.officeNotarial,
+                  adresse: n?.adresse,
+                  ville: n?.ville,
+                  coords: n?.latitude && n?.longitude ? `${n.latitude},${n.longitude}` : 'pas de coordonnées'
+                };
+              })
+            });
+          }
+        });
+
+        console.log(`${response.notaires.length} notaires chargés depuis Google Sheets`);
+        setNotaires(response.notaires);
+        setError(null);
+      } catch (error) {
+        console.error('Erreur lors du chargement des données:', error);
+        setError('Erreur lors du chargement des données. Veuillez réessayer.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadData();
   }, []);
 
@@ -174,22 +173,9 @@ const App: React.FC = () => {
     checkConfig();
   }, []);
 
-  const handleStatutChange = async (notaire: Notaire, newStatut: NotaireStatut) => {
+  const handleStatutChange = (notaire: Notaire, newStatut: NotaireStatut) => {
     const updatedNotaire = { ...notaire, statut: newStatut, dateModification: new Date().toISOString() };
     setNotaires(notaires.map(n => n.id === notaire.id ? updatedNotaire : n));
-    try {
-      await googleSheetsService.saveToSheet(updatedNotaire);
-    } catch (error) {
-      console.error('Erreur de synchronisation:', error);
-      addToast(
-        error instanceof Error 
-          ? `Erreur de synchronisation : ${error.message}`
-          : 'Erreur de synchronisation inconnue',
-        'error'
-      );
-      // En cas d'erreur, recharger les données pour s'assurer de la cohérence
-      await loadData();
-    }
   };
 
   const notairesFiltres = useMemo(() => {
@@ -290,37 +276,10 @@ const App: React.FC = () => {
     setSelectedNotaire(null);
   };
 
-  const handleNotaireUpdate = async (updatedNotaire: Notaire) => {
-    try {
-      // Mettre à jour l'état local immédiatement
-      const newNotaires = notaires.map(n => n.id === updatedNotaire.id ? updatedNotaire : n);
-      setNotaires(newNotaires);
-
-      // Sauvegarder dans Google Sheets
-      await googleSheetsService.saveToSheet(updatedNotaire);
-
-      // Recharger les données pour s'assurer de la cohérence
-      const response = await googleSheetsService.loadFromSheet();
-      setNotaires(response.notaires);
-
-      addToast('Modifications sauvegardées avec succès', 'success');
-    } catch (error) {
-      console.error('Erreur de synchronisation:', error);
-      addToast(
-        error instanceof Error 
-          ? `Erreur de synchronisation : ${error.message}`
-          : 'Erreur de synchronisation inconnue',
-        'error'
-      );
-
-      // En cas d'erreur, recharger les données pour s'assurer de la cohérence
-      try {
-        const response = await googleSheetsService.loadFromSheet();
-        setNotaires(response.notaires);
-      } catch (reloadError) {
-        console.error('Erreur lors du rechargement des données:', reloadError);
-      }
-    }
+  const handleNotaireUpdate = (updatedNotaire: Notaire) => {
+    const newNotaires = notaires.map(n => n.id === updatedNotaire.id ? updatedNotaire : n);
+    setNotaires(newNotaires);
+    // La synchronisation sera faite automatiquement par le composant qui a fait la mise à jour
   };
 
   const handleFiltresChange = (newFiltres: Filtres) => {
