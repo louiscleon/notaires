@@ -232,10 +232,13 @@ const MapComponent: React.FC<Props> = ({
     const notairesMap = new Map(filteredNotaires.map(n => [n.id, n]));
     notairesRef.current = notairesMap;
 
+    console.log('=== DEBUG MAP COMPONENT ===');
     console.log('Total notaires reçus:', filteredNotaires.length);
     console.log('Notaires avec coordonnées:', filteredNotaires.filter(n => n.latitude && n.longitude).length);
     console.log('Notaires sans coordonnées:', filteredNotaires.filter(n => !n.latitude || !n.longitude).length);
     console.log('Notaires nécessitant un géocodage:', filteredNotaires.filter(n => n.needsGeocoding).length);
+    console.log('Villes d\'intérêt:', villesInteret);
+    console.log('Villes d\'intérêt avec coordonnées:', villesInteret.filter(v => v.latitude && v.longitude).length);
 
     // Filtrer les notaires qui ont déjà des coordonnées valides
     let notairesValides = filteredNotaires.filter(n =>
@@ -247,6 +250,7 @@ const MapComponent: React.FC<Props> = ({
     );
     
     console.log('Notaires valides après filtrage:', notairesValides.length);
+    console.log('Exemple de notaire valide:', notairesValides[0]);
     
     // Mettre à jour les notaires avec coordonnées
     setNotairesAvecCoordonnees(notairesValides);

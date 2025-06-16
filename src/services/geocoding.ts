@@ -82,13 +82,18 @@ export class GeocodingService {
     const cacheKey = this.getCacheKey(address);
     const cached = this.cache[cacheKey];
 
+    console.log('=== DEBUG GEOCODING SERVICE ===');
+    console.log('Adresse à géocoder:', address);
+    console.log('Cache key:', cacheKey);
+    console.log('Cache hit:', !!cached);
+
     if (cached && this.isCacheValid(cached.timestamp)) {
       console.log('Utilisation du cache pour:', address);
       return cached.result;
     }
 
     try {
-      console.log('Géocodage de l\'adresse:', address);
+      console.log('Appel API de géocodage pour:', address);
       const response = await this.retryWithDelay(() => 
         axios.get(
           `/api/geocoding?address=${encodeURIComponent(address)}`,
