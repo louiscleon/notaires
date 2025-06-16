@@ -14,7 +14,6 @@ const SHEET_RANGES = {
 
 async function fetchWithCors(url: string, options?: RequestInit): Promise<Response> {
   try {
-    console.log('Fetching URL:', url, 'with options:', options);
     const response = await fetch(url, {
       ...options,
       mode: 'cors',
@@ -28,14 +27,6 @@ async function fetchWithCors(url: string, options?: RequestInit): Promise<Respon
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('API Error Response:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        body: errorText
-      });
-      
-      // Check if the response is HTML instead of JSON
       if (errorText.trim().startsWith('<!DOCTYPE html>')) {
         throw new Error('Received HTML response instead of JSON. The API endpoint might be incorrect or the server might be down.');
       }
@@ -45,7 +36,6 @@ async function fetchWithCors(url: string, options?: RequestInit): Promise<Respon
 
     return response;
   } catch (error) {
-    console.error('Fetch error:', error);
     if (error instanceof TypeError && error.message.includes('CORS')) {
       throw new Error('Erreur de connexion à l\'API. Veuillez vérifier que l\'API est bien déployée et accessible.');
     }
@@ -55,13 +45,10 @@ async function fetchWithCors(url: string, options?: RequestInit): Promise<Respon
 
 async function parseJsonResponse(response: Response): Promise<any> {
   const text = await response.text();
-  console.log('Raw API response:', text);
   
   try {
     return JSON.parse(text);
   } catch (error) {
-    console.error('JSON Parse Error:', error);
-    console.error('Failed to parse response:', text);
     throw new Error(`Invalid JSON response: ${text}`);
   }
 }
@@ -69,7 +56,6 @@ async function parseJsonResponse(response: Response): Promise<any> {
 export const googleSheetsService = {
   async loadFromSheet(): Promise<SheetData> {
     try {
-      console.log('=== DEBUG LOAD FROM SHEET ===');
       // Charger les notaires
       const responseNotaires = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.NOTAIRES}`);
       const dataNotaires = await parseJsonResponse(responseNotaires);
@@ -88,7 +74,6 @@ export const googleSheetsService = {
 
       return { notaires, villesInteret };
     } catch (error) {
-      console.error('Error loading from sheet:', error);
       throw error;
     }
   },
@@ -96,7 +81,6 @@ export const googleSheetsService = {
   async saveToSheet(notaire: Notaire | Notaire[]): Promise<void> {
     try {
       const notaires = Array.isArray(notaire) ? notaire : [notaire];
-      console.log('Saving notaires to sheet:', notaires.length);
 
       // Convertir les notaires en tableau de valeurs pour Google Sheets
       const values = notaires.map(notaire => [
@@ -131,17 +115,13 @@ export const googleSheetsService = {
       });
 
       const data = await parseJsonResponse(response);
-      console.log('Save response:', data);
     } catch (error) {
-      console.error('Error saving to sheet:', error);
       throw error;
     }
   },
 
   async saveVillesInteret(villesInteret: VilleInteret[]): Promise<void> {
     try {
-      console.log('Saving villes interet:', villesInteret.length);
-
       const response = await fetchWithCors(`${API_BASE_URL}/sheets/villes-interet`, {
         method: 'POST',
         body: JSON.stringify({ 
@@ -151,29 +131,23 @@ export const googleSheetsService = {
       });
 
       const data = await parseJsonResponse(response);
-      console.log('Save response:', data);
     } catch (error) {
-      console.error('Error saving villes interet:', error);
       throw error;
     }
   },
 
   async testConfig(): Promise<any> {
     try {
-      console.log('Testing API configuration...');
       const response = await fetchWithCors(`${API_BASE_URL}/test`);
       const data = await parseJsonResponse(response);
-      console.log('Test response:', data);
       return data;
     } catch (error) {
-      console.error('Error testing config:', error);
       throw error;
     }
   }
 };
 
 function parseNotaire(row: any[]): Notaire {
-  console.log('Parsing notaire row:', row);
   const [
     id,
     officeNotarial,
@@ -209,17 +183,12 @@ function parseNotaire(row: any[]): Notaire {
   try {
     parsedGeocodingHistory = geocodingHistory ? JSON.parse(geocodingHistory) : [];
   } catch (e) {
-    console.warn('Failed to parse geocoding history:', e);
     parsedGeocodingHistory = [];
   }
   
   // Vérifier si l'adresse a changé en comparant avec l'historique de géocodage
   const adresseAChange = !parsedGeocodingHistory || parsedGeocodingHistory.length === 0 || 
     (parsedGeocodingHistory[parsedGeocodingHistory.length - 1]?.address?.toLowerCase().trim() !== adresseComplete);
-
-  console.log('Adresse complète:', adresseComplete);
-  console.log('Adresse a changé:', adresseAChange);
-  console.log('Coordonnées existantes:', { latitude, longitude });
 
   // Déterminer si le géocodage est nécessaire
   const shouldGeocode = !latitude || !longitude || adresseAChange;
@@ -245,7 +214,6 @@ function parseNotaire(row: any[]): Notaire {
     if (!isNaN(num) && num >= -180 && num <= 180) {
       return num;
     }
-    console.warn('Coordonnée invalide:', value, '->', cleanValue, '->', num);
     return undefined;
   };
 
@@ -301,11 +269,6 @@ function parseNotaire(row: any[]): Notaire {
     siteWeb: '', // Cette colonne n'existe plus dans la nouvelle structure
     statut: (() => {
       const normalizedStatut = String(statut || '').toLowerCase().trim();
-      console.log('Normalizing statut:', { 
-        original: statut, 
-        normalized: normalizedStatut,
-        row: row
-      });
       
       // Mapping des valeurs possibles vers les statuts valides
       const statutMap: { [key: string]: NotaireStatut } = {
@@ -323,7 +286,6 @@ function parseNotaire(row: any[]): Notaire {
       };
 
       const finalStatut = statutMap[normalizedStatut] || 'non_defini';
-      console.log('Final statut:', finalStatut);
       return finalStatut;
     })(),
     dateContact: new Date().toISOString(), // Valeur par défaut
@@ -344,21 +306,6 @@ function parseNotaire(row: any[]): Notaire {
     geoStatus: shouldGeocode ? 'pending' : 'success'
   };
 
-  // Log des coordonnées pour debug
-  console.log('=== DEBUG COORDINATES PARSING ===');
-  console.log('Raw coordinates:', { latitude, longitude });
-  console.log('Parsed coordinates:', { 
-    latitude: notaire.latitude, 
-    longitude: notaire.longitude 
-  });
-  console.log('Notaire:', {
-    id: notaire.id,
-    office: notaire.officeNotarial,
-    needsGeocoding: notaire.needsGeocoding,
-    geoStatus: notaire.geoStatus
-  });
-
-  console.log('Parsed notaire:', notaire);
   return notaire;
 }
 
