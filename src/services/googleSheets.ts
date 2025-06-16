@@ -8,6 +8,7 @@ interface SheetData {
 
 async function fetchWithCors(url: string, options?: RequestInit): Promise<Response> {
   try {
+    console.log('Fetching URL:', url, 'with options:', options);
     const response = await fetch(url, {
       ...options,
       mode: 'cors',
@@ -19,7 +20,14 @@ async function fetchWithCors(url: string, options?: RequestInit): Promise<Respon
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      console.error('API Error Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        body: errorText
+      });
+      throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
     }
 
     return response;
@@ -40,8 +48,12 @@ export const googleSheetsService = {
       const data = await response.json();
       console.log('API response:', data);
 
-      const notaires = data.notaires || [];
-      const villesInteret = data.villesInteret || [];
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid API response format');
+      }
+
+      const notaires = Array.isArray(data.notaires) ? data.notaires : [];
+      const villesInteret = Array.isArray(data.villesInteret) ? data.villesInteret : [];
 
       // Vérifier les données des notaires
       console.log('Checking notaires data:', {
@@ -68,12 +80,13 @@ export const googleSheetsService = {
       const notaires = Array.isArray(notaire) ? notaire : [notaire];
       console.log('Saving notaires to sheet:', notaires.length);
 
-      await fetchWithCors(`${API_BASE_URL}/sheets`, {
+      const response = await fetchWithCors(`${API_BASE_URL}/sheets`, {
         method: 'POST',
         body: JSON.stringify({ notaires }),
       });
 
-      console.log('Save successful');
+      const data = await response.json();
+      console.log('Save response:', data);
     } catch (error) {
       console.error('Error saving to sheet:', error);
       throw error;
@@ -84,12 +97,13 @@ export const googleSheetsService = {
     try {
       console.log('Saving villes interet:', villesInteret.length);
 
-      await fetchWithCors(`${API_BASE_URL}/sheets/villes-interet`, {
+      const response = await fetchWithCors(`${API_BASE_URL}/sheets/villes-interet`, {
         method: 'POST',
         body: JSON.stringify({ villesInteret }),
       });
 
-      console.log('Save successful');
+      const data = await response.json();
+      console.log('Save response:', data);
     } catch (error) {
       console.error('Error saving villes interet:', error);
       throw error;
@@ -98,8 +112,11 @@ export const googleSheetsService = {
 
   async testConfig(): Promise<any> {
     try {
+      console.log('Testing API configuration...');
       const response = await fetchWithCors(`${API_BASE_URL}/sheets/test`);
-      return response.json();
+      const data = await response.json();
+      console.log('Test response:', data);
+      return data;
     } catch (error) {
       console.error('Error testing config:', error);
       throw error;
