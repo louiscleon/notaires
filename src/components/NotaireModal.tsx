@@ -278,9 +278,28 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     }
   };
 
+  // Fonction pour gérer la fermeture du modal avec synchronisation
+  const handleModalClose = async () => {
+    try {
+      setSaveError(null);
+      
+      // Synchroniser avec Google Sheets avant de fermer
+      await notaireService.updateNotaire(editedNotaire);
+      
+      // Mettre à jour l'état parent
+      onSave(editedNotaire);
+      
+      // Fermer le modal
+      onClose();
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation finale:', error);
+      setSaveError('Erreur lors de la sauvegarde. Voulez-vous réessayer avant de fermer ?');
+    }
+  };
+
   return (
     <Transition.Root show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
+      <Dialog as="div" className="relative z-50" onClose={handleModalClose}>
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-300"
@@ -311,7 +330,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                       {notaire.officeNotarial}
                     </Dialog.Title>
                     <button
-                      onClick={onClose}
+                      onClick={handleModalClose}
                       className="text-white hover:text-gray-200 transition-colors duration-200"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

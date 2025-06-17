@@ -220,6 +220,44 @@ const App: React.FC = () => {
     storageService.saveFiltres(newFiltres);
   };
 
+  // Synchroniser avant de quitter la page
+  useEffect(() => {
+    const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
+      if (selectedNotaire) {
+        e.preventDefault();
+        e.returnValue = '';
+        
+        try {
+          await notaireService.syncWithGoogleSheets();
+        } catch (error) {
+          console.error('Erreur lors de la synchronisation finale:', error);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [selectedNotaire]);
+
+  // Synchroniser périodiquement
+  useEffect(() => {
+    const syncInterval = setInterval(async () => {
+      if (selectedNotaire) {
+        try {
+          await notaireService.syncWithGoogleSheets();
+        } catch (error) {
+          console.error('Erreur lors de la synchronisation automatique:', error);
+        }
+      }
+    }, 30000); // Synchroniser toutes les 30 secondes si un notaire est sélectionné
+
+    return () => {
+      clearInterval(syncInterval);
+    };
+  }, [selectedNotaire]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 to-white">
