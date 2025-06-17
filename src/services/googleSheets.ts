@@ -6,6 +6,11 @@ interface SheetData {
   villesInteret: VilleInteret[];
 }
 
+// Configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 seconde
+const REQUEST_TIMEOUT = 30000; // 30 secondes
+
 // Définition des plages de cellules pour Google Sheets
 const SHEET_RANGES = {
   NOTAIRES: 'Notaires!A2:Z',
@@ -21,12 +26,65 @@ function isValidVilleInteretData(data: any[]): boolean {
   return Array.isArray(data) && data.length >= 7;
 }
 
+// Types pour la gestion des erreurs
+class RetryableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RetryableError';
+  }
+}
+
+// Fonction utilitaire pour attendre
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Type guard pour les erreurs
+function isError(error: unknown): error is Error {
+  return error instanceof Error;
+}
+
+// Fonction utilitaire pour retry
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  retries: number = MAX_RETRIES,
+  delay: number = RETRY_DELAY
+): Promise<T> {
+  let attempt = 0;
+  let currentDelay = delay;
+
+  while (attempt <= retries) {
+    try {
+      return await operation();
+    } catch (error: unknown) {
+      if (attempt === retries) {
+        if (isError(error)) {
+          throw error;
+        }
+        throw new Error(String(error));
+      }
+      
+      const message = isError(error) ? error.message : String(error);
+      console.log(`Attempt ${attempt + 1}/${retries} failed: ${message}`);
+      console.log(`Retrying in ${currentDelay}ms...`);
+      
+      await wait(currentDelay);
+      currentDelay *= 2;
+      attempt++;
+    }
+  }
+
+  throw new Error('Unexpected error in retry logic');
+}
+
 async function fetchWithCors(url: string, options?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+
   try {
     const response = await fetch(url, {
       ...options,
       mode: 'cors',
       credentials: 'include',
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -37,18 +95,23 @@ async function fetchWithCors(url: string, options?: RequestInit): Promise<Respon
     if (!response.ok) {
       const errorText = await response.text();
       if (errorText.trim().startsWith('<!DOCTYPE html>')) {
-        throw new Error('Received HTML response instead of JSON. The API endpoint might be incorrect or the server might be down.');
+        throw new Error('API error: Server returned HTML instead of JSON. The server might be down.');
       }
       
-      throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+      throw new Error(`API error: ${response.status} - ${errorText}`);
     }
 
     return response;
   } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('API error: Request timed out');
+    }
     if (error instanceof TypeError && error.message.includes('CORS')) {
-      throw new Error('Erreur de connexion à l\'API. Veuillez vérifier que l\'API est bien déployée et accessible.');
+      throw new Error('API error: CORS issue - Please check API configuration');
     }
     throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -58,131 +121,133 @@ async function parseJsonResponse(response: Response): Promise<any> {
   try {
     return JSON.parse(text);
   } catch (error) {
-    throw new Error(`Invalid JSON response: ${text}`);
+    throw new Error(`API error: Invalid JSON response - ${text}`);
   }
 }
 
 export const googleSheetsService = {
   async loadFromSheet(): Promise<SheetData> {
-    try {
-      // Charger les notaires
-      const responseNotaires = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.NOTAIRES}`);
-      const dataNotaires = await parseJsonResponse(responseNotaires);
-      
-      if (!Array.isArray(dataNotaires)) {
-        throw new Error('Invalid API response format for notaires: not an array');
+    return withRetry(async () => {
+      try {
+        // Charger les notaires
+        const responseNotaires = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.NOTAIRES}`);
+        const dataNotaires = await parseJsonResponse(responseNotaires);
+        
+        if (!Array.isArray(dataNotaires)) {
+          throw new Error('API error: Invalid notaires data format');
+        }
+
+        const notaires = dataNotaires.map((row, index) => {
+          if (!isValidNotaireData(row)) {
+            console.warn(`Invalid notaire data at index ${index}:`, row);
+            return null;
+          }
+          try {
+            return parseNotaire(row);
+          } catch (error) {
+            console.error(`Error parsing notaire at index ${index}:`, error);
+            return null;
+          }
+        }).filter((n): n is Notaire => n !== null);
+
+        // Charger les villes d'intérêt
+        const responseVilles = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.VILLES_INTERET}`);
+        const dataVilles = await parseJsonResponse(responseVilles);
+        
+        if (!Array.isArray(dataVilles)) {
+          throw new Error('API error: Invalid villes d\'intérêt data format');
+        }
+
+        const villesInteret = dataVilles.map((row, index) => {
+          if (!isValidVilleInteretData(row)) {
+            console.warn(`Invalid ville d'intérêt data at index ${index}:`, row);
+            return null;
+          }
+          try {
+            return parseVilleInteret(row);
+          } catch (error) {
+            console.error(`Error parsing ville d'intérêt at index ${index}:`, error);
+            return null;
+          }
+        }).filter((v): v is VilleInteret => v !== null);
+
+        if (notaires.length === 0) {
+          throw new Error('API error: No valid notaires data found');
+        }
+
+        return { notaires, villesInteret };
+      } catch (error) {
+        console.error('Error in loadFromSheet:', error);
+        throw error;
       }
-
-      const notaires = dataNotaires.map((row, index) => {
-        if (!isValidNotaireData(row)) {
-          console.warn(`Invalid notaire data at index ${index}:`, row);
-          return null;
-        }
-        try {
-          return parseNotaire(row);
-        } catch (error) {
-          console.error(`Error parsing notaire at index ${index}:`, error);
-          return null;
-        }
-      }).filter((n): n is Notaire => n !== null);
-
-      // Charger les villes d'intérêt
-      const responseVilles = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.VILLES_INTERET}`);
-      const dataVilles = await parseJsonResponse(responseVilles);
-      
-      if (!Array.isArray(dataVilles)) {
-        throw new Error('Invalid API response format for villes d\'intérêt: not an array');
-      }
-
-      const villesInteret = dataVilles.map((row, index) => {
-        if (!isValidVilleInteretData(row)) {
-          console.warn(`Invalid ville d'intérêt data at index ${index}:`, row);
-          return null;
-        }
-        try {
-          return parseVilleInteret(row);
-        } catch (error) {
-          console.error(`Error parsing ville d'intérêt at index ${index}:`, error);
-          return null;
-        }
-      }).filter((v): v is VilleInteret => v !== null);
-
-      if (notaires.length === 0) {
-        throw new Error('No valid notaires data found');
-      }
-
-      return { notaires, villesInteret };
-    } catch (error) {
-      console.error('Error in loadFromSheet:', error);
-      throw error;
-    }
+    });
   },
 
   async saveToSheet(notaire: Notaire | Notaire[]): Promise<void> {
-    try {
-      const notaires = Array.isArray(notaire) ? notaire : [notaire];
+    return withRetry(async () => {
+      try {
+        const notaires = Array.isArray(notaire) ? notaire : [notaire];
 
-      // Valider les données avant l'envoi
-      const validNotaires = notaires.filter(n => {
-        if (!n.id || !n.officeNotarial) {
-          console.warn('Invalid notaire data:', n);
-          return false;
+        // Valider les données avant l'envoi
+        const validNotaires = notaires.filter(n => {
+          if (!n.id || !n.officeNotarial) {
+            console.warn('Invalid notaire data:', n);
+            return false;
+          }
+          return true;
+        });
+
+        if (validNotaires.length === 0) {
+          throw new Error('API error: No valid notaires to save');
         }
-        return true;
-      });
 
-      if (validNotaires.length === 0) {
-        throw new Error('No valid notaires to save');
+        // Convertir les notaires en tableau de valeurs pour Google Sheets
+        const values = validNotaires.map(notaire => [
+          notaire.id,
+          notaire.officeNotarial,
+          notaire.adresse,
+          notaire.codePostal,
+          notaire.ville,
+          notaire.departement,
+          notaire.email,
+          notaire.notairesAssocies,
+          notaire.notairesSalaries,
+          notaire.nbAssocies,
+          notaire.nbSalaries,
+          notaire.serviceNego ? 'oui' : 'non',
+          notaire.statut,
+          notaire.notes,
+          JSON.stringify(notaire.contacts || []),
+          notaire.dateModification,
+          notaire.latitude,
+          notaire.longitude,
+          notaire.geoScore,
+          JSON.stringify(notaire.geocodingHistory || [])
+        ]);
+
+        const response = await fetchWithCors(`${API_BASE_URL}/sheets`, {
+          method: 'POST',
+          body: JSON.stringify({ 
+            range: SHEET_RANGES.NOTAIRES,
+            values
+          }),
+        });
+
+        const data = await parseJsonResponse(response);
+        
+        if (data.error) {
+          throw new Error(`API error: ${data.message || 'Failed to save to Google Sheets'}`);
+        }
+
+        if (!data.data || !data.data.updatedRange) {
+          console.warn('Warning: Unexpected API response format:', data);
+        }
+
+      } catch (error) {
+        console.error('Error in saveToSheet:', error);
+        throw error;
       }
-
-      // Convertir les notaires en tableau de valeurs pour Google Sheets
-      const values = validNotaires.map(notaire => [
-        notaire.id,
-        notaire.officeNotarial,
-        notaire.adresse,
-        notaire.codePostal,
-        notaire.ville,
-        notaire.departement,
-        notaire.email,
-        notaire.notairesAssocies,
-        notaire.notairesSalaries,
-        notaire.nbAssocies,
-        notaire.nbSalaries,
-        notaire.serviceNego ? 'oui' : 'non',
-        notaire.statut,
-        notaire.notes,
-        JSON.stringify(notaire.contacts || []),
-        notaire.dateModification,
-        notaire.latitude,
-        notaire.longitude,
-        notaire.geoScore,
-        JSON.stringify(notaire.geocodingHistory || [])
-      ]);
-
-      const response = await fetchWithCors(`${API_BASE_URL}/sheets`, {
-        method: 'POST',
-        body: JSON.stringify({ 
-          range: SHEET_RANGES.NOTAIRES,
-          values
-        }),
-      });
-
-      const data = await parseJsonResponse(response);
-      
-      // Vérifier si la réponse contient une erreur
-      if (data.error) {
-        throw new Error(data.message || 'Failed to save to Google Sheets');
-      }
-
-      // Vérifier si la réponse contient les données attendues
-      if (!data.data || !data.data.updatedRange) {
-        console.warn('Unexpected API response format:', data);
-      }
-
-    } catch (error) {
-      console.error('Error in saveToSheet:', error);
-      throw error;
-    }
+    });
   },
 
   async saveVillesInteret(villesInteret: VilleInteret[]): Promise<void> {
