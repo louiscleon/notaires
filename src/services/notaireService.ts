@@ -34,8 +34,6 @@ class NotaireService {
   private villesInteret: VilleInteret[] = [];
   private subscribers: ((notaires: Notaire[], villesInteret: VilleInteret[]) => void)[] = [];
   private isInitialized: boolean = false;
-  private syncTimeout: NodeJS.Timeout | null = null;
-  private readonly SYNC_DELAY = 2000; // 2 secondes de délai avant synchronisation
 
   // Singleton instance
   private static instance: NotaireService;
@@ -62,18 +60,6 @@ class NotaireService {
   // Notify all subscribers
   private notifySubscribers() {
     this.subscribers.forEach(callback => callback(this.notaires, this.villesInteret));
-  }
-
-  // Schedule sync with delay
-  private scheduleSyncWithGoogleSheets() {
-    if (this.syncTimeout) {
-      clearTimeout(this.syncTimeout);
-    }
-    this.syncTimeout = setTimeout(() => {
-      this.syncWithGoogleSheets().catch(error => {
-        console.error('Error during scheduled sync:', error);
-      });
-    }, this.SYNC_DELAY);
   }
 
   // Load initial data
@@ -153,30 +139,29 @@ class NotaireService {
       throw new Error('Invalid notaire data');
     }
 
-    try {
-      // Update local state
-      const index = this.notaires.findIndex(n => n.id === updatedNotaire.id);
-      if (index === -1) {
-        throw new Error(`Notaire with ID ${updatedNotaire.id} not found`);
-      }
+    const originalNotaire = this.notaires.find(n => n.id === updatedNotaire.id);
+    if (!originalNotaire) {
+      throw new Error(`Notaire with ID ${updatedNotaire.id} not found`);
+    }
 
+    try {
       // Update the modification date
       updatedNotaire.dateModification = new Date().toISOString();
 
       // Update local state
+      const index = this.notaires.findIndex(n => n.id === updatedNotaire.id);
       this.notaires[index] = updatedNotaire;
+      
+      // Sync immediately with Google Sheets
+      await googleSheetsService.saveToSheet(updatedNotaire);
+      
+      // Notify subscribers only after successful sync
       this.notifySubscribers();
-
-      // Schedule sync with Google Sheets
-      this.scheduleSyncWithGoogleSheets();
     } catch (error) {
       // Restaurer l'état précédent en cas d'erreur
-      const originalNotaire = this.notaires.find(n => n.id === updatedNotaire.id);
-      if (originalNotaire) {
-        const index = this.notaires.findIndex(n => n.id === updatedNotaire.id);
-        this.notaires[index] = originalNotaire;
-        this.notifySubscribers();
-      }
+      const index = this.notaires.findIndex(n => n.id === updatedNotaire.id);
+      this.notaires[index] = originalNotaire;
+      this.notifySubscribers();
 
       console.error('Error updating notaire:', error);
       throw error;
@@ -200,10 +185,12 @@ class NotaireService {
     try {
       // Mettre à jour l'état local
       this.villesInteret = validVillesInteret;
-      this.notifySubscribers();
-
+      
       // Synchroniser avec Google Sheets
       await googleSheetsService.saveVillesInteret(validVillesInteret);
+      
+      // Notifier les abonnés après la synchronisation réussie
+      this.notifySubscribers();
     } catch (error) {
       // Restaurer l'état précédent en cas d'erreur
       this.villesInteret = previousVillesInteret;
@@ -245,10 +232,6 @@ class NotaireService {
     this.villesInteret = [];
     this.subscribers = [];
     this.isInitialized = false;
-    if (this.syncTimeout) {
-      clearTimeout(this.syncTimeout);
-      this.syncTimeout = null;
-    }
   }
 }
 

@@ -102,7 +102,6 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   const [geocodingStatus, setGeocodingStatus] = useState<string>('');
   const [adresseSuggestions, setAdresseSuggestions] = useState<AdresseSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -146,18 +145,15 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     };
     setEditedNotaire(updatedNotaire);
 
-    // Annuler le timeout précédent s'il existe
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    // Créer un nouveau timeout pour sauvegarder
-    saveTimeoutRef.current = setTimeout(async () => {
-      await saveAndSync(updatedNotaire);
-    }, 500);
-
     if (name === 'adresse') {
       setShowSuggestions(true);
+    }
+
+    // Sauvegarder immédiatement
+    try {
+      await saveAndSync(updatedNotaire);
+    } catch (error) {
+      // L'erreur est déjà gérée dans saveAndSync
     }
   };
 
@@ -244,14 +240,6 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       setSaveError('Erreur lors de la sauvegarde. Les modifications seront perdues au rechargement de la page.');
     }
   };
-
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, []);
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>
