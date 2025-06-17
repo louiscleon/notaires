@@ -136,11 +136,13 @@ class NotaireService {
     }
 
     if (!isValidNotaire(updatedNotaire)) {
+      console.error('Données de notaire invalides:', updatedNotaire);
       throw new Error('Invalid notaire data');
     }
 
     const originalNotaire = this.notaires.find(n => n.id === updatedNotaire.id);
     if (!originalNotaire) {
+      console.error('Notaire non trouvé:', updatedNotaire.id);
       throw new Error(`Notaire with ID ${updatedNotaire.id} not found`);
     }
 
@@ -149,21 +151,27 @@ class NotaireService {
       updatedNotaire.dateModification = new Date().toISOString();
 
       // Sync with Google Sheets first and wait for completion
-      console.log('Début de la synchronisation avec Google Sheets...');
+      console.log('Début de la synchronisation avec Google Sheets...', updatedNotaire.id);
       await googleSheetsService.saveToSheet(updatedNotaire);
-      console.log('Synchronisation avec Google Sheets réussie');
+      console.log('Synchronisation avec Google Sheets réussie pour', updatedNotaire.id);
 
       // Only update local state if Google Sheets sync was successful
       const index = this.notaires.findIndex(n => n.id === updatedNotaire.id);
       this.notaires[index] = updatedNotaire;
       this.notifySubscribers();
+      
+      console.log('État local mis à jour avec succès pour', updatedNotaire.id);
     } catch (error) {
-      console.error('Error updating notaire:', error);
+      console.error('Erreur détaillée lors de la mise à jour du notaire:', {
+        notaireId: updatedNotaire.id,
+        error: error instanceof Error ? error.message : error
+      });
       // Restore original state
       const index = this.notaires.findIndex(n => n.id === updatedNotaire.id);
       if (index !== -1 && originalNotaire) {
         this.notaires[index] = originalNotaire;
         this.notifySubscribers();
+        console.log('État local restauré après erreur pour', updatedNotaire.id);
       }
       throw error;
     }
