@@ -193,12 +193,13 @@ export const googleSheetsService = {
 
   async saveToSheet(notaire: Notaire | Notaire[]): Promise<void> {
     try {
+      console.log('📥 Début saveToSheet avec:', { notaire });
       const notaires = Array.isArray(notaire) ? notaire : [notaire];
 
       // Valider les données avant l'envoi
       const validNotaires = notaires.filter(n => {
         if (!n.id || !n.officeNotarial) {
-          console.warn('Invalid notaire data:', n);
+          console.warn('❌ Données invalides:', n);
           return false;
         }
         return true;
@@ -209,6 +210,7 @@ export const googleSheetsService = {
       }
 
       // Convertir les notaires en tableau de valeurs pour Google Sheets
+      console.log('🔄 Conversion des données pour Google Sheets...');
       const values = validNotaires.map(notaire => [
         notaire.id,
         notaire.officeNotarial,
@@ -232,7 +234,8 @@ export const googleSheetsService = {
         JSON.stringify(notaire.geocodingHistory || [])
       ]);
 
-      console.log('Envoi des données à Google Sheets...', {
+      console.log('📤 Envoi à l\'API...', {
+        range: SHEET_RANGES.NOTAIRES,
         nombreNotaires: values.length,
         exemple: values[0]
       });
@@ -250,23 +253,24 @@ export const googleSheetsService = {
         2000
       );
 
+      console.log('📥 Réponse reçue de l\'API');
       const data = await parseJsonResponse(response);
       
       if (data.error) {
-        console.error('Erreur de réponse API:', data);
+        console.error('❌ Erreur de réponse API:', data);
         throw new Error(`API error: ${data.message || 'Failed to save to Google Sheets'}`);
       }
 
       if (!data.data || !data.data.updatedRange) {
-        console.warn('Warning: Unexpected API response format:', data);
+        console.warn('⚠️ Format de réponse inattendu:', data);
       } else {
-        console.log('Données sauvegardées avec succès dans Google Sheets');
-        console.log('Plage mise à jour:', data.data.updatedRange);
+        console.log('✅ Données sauvegardées avec succès');
+        console.log('📍 Plage mise à jour:', data.data.updatedRange);
       }
 
     } catch (err: unknown) {
       const error = createError(err);
-      console.error('Error in saveToSheet:', error.message);
+      console.error('❌ Erreur dans saveToSheet:', error.message);
       throw error;
     }
   },
