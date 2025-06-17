@@ -128,7 +128,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     return () => clearTimeout(timeoutId);
   }, [editedNotaire.adresse]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
     // S'assurer que l'ID est toujours présent
@@ -143,7 +143,22 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       [name]: value,
       id: editedNotaire.id // Forcer l'ID à être conservé
     };
-    setEditedNotaire(updatedNotaire);
+
+    try {
+      // Mettre à jour l'état local
+      setEditedNotaire(updatedNotaire);
+
+      // Synchroniser immédiatement avec Google Sheets
+      await notaireService.updateNotaire(updatedNotaire);
+      
+      // Mettre à jour l'état parent
+      onSave(updatedNotaire);
+
+      console.log(`Champ ${name} mis à jour et synchronisé: ${value}`);
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation:', error);
+      setSaveError('Erreur lors de la sauvegarde. Veuillez réessayer.');
+    }
 
     if (name === 'adresse') {
       setShowSuggestions(true);
@@ -225,13 +240,18 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       id: editedNotaire.id,
       [name]: checked
     };
-    setEditedNotaire(updatedNotaire);
 
     try {
-      setSaveError(null);
+      // Mettre à jour l'état local
+      setEditedNotaire(updatedNotaire);
+
+      // Synchroniser immédiatement avec Google Sheets
       await notaireService.updateNotaire(updatedNotaire);
+      
+      // Mettre à jour l'état parent
       onSave(updatedNotaire);
-      console.log(`Case à cocher ${name} mise à jour et synchronisée avec Google Sheets: ${checked}`);
+
+      console.log(`Case à cocher ${name} mise à jour et synchronisée: ${checked}`);
     } catch (error) {
       console.error('Erreur lors de la synchronisation:', error);
       setSaveError('Erreur lors de la sauvegarde. Veuillez réessayer.');
@@ -250,13 +270,18 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       id: editedNotaire.id,
       statut: value
     };
-    setEditedNotaire(updatedNotaire);
 
     try {
-      setSaveError(null);
+      // Mettre à jour l'état local
+      setEditedNotaire(updatedNotaire);
+
+      // Synchroniser immédiatement avec Google Sheets
       await notaireService.updateNotaire(updatedNotaire);
+      
+      // Mettre à jour l'état parent
       onSave(updatedNotaire);
-      console.log(`Statut mis à jour et synchronisé avec Google Sheets: ${value}`);
+
+      console.log(`Statut mis à jour et synchronisé: ${value}`);
     } catch (error) {
       console.error('Erreur lors de la synchronisation:', error);
       setSaveError('Erreur lors de la sauvegarde. Veuillez réessayer.');

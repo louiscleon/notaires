@@ -148,8 +148,10 @@ class NotaireService {
       // Update the modification date
       updatedNotaire.dateModification = new Date().toISOString();
 
-      // Sync with Google Sheets first
+      // Sync with Google Sheets first and wait for completion
+      console.log('Début de la synchronisation avec Google Sheets...');
       await googleSheetsService.saveToSheet(updatedNotaire);
+      console.log('Synchronisation avec Google Sheets réussie');
 
       // Only update local state if Google Sheets sync was successful
       const index = this.notaires.findIndex(n => n.id === updatedNotaire.id);
@@ -157,6 +159,12 @@ class NotaireService {
       this.notifySubscribers();
     } catch (error) {
       console.error('Error updating notaire:', error);
+      // Restore original state
+      const index = this.notaires.findIndex(n => n.id === updatedNotaire.id);
+      if (index !== -1 && originalNotaire) {
+        this.notaires[index] = originalNotaire;
+        this.notifySubscribers();
+      }
       throw error;
     }
   }
@@ -199,20 +207,10 @@ class NotaireService {
     }
 
     try {
-      // Valider toutes les données avant la synchronisation
-      const validNotaires = this.notaires.filter(notaire => {
-        if (!isValidNotaire(notaire)) {
-          console.warn('Invalid notaire data:', notaire);
-          return false;
-        }
-        return true;
-      });
-
-      if (validNotaires.length === 0) {
-        throw new Error('No valid notaires to sync');
-      }
-
-      await googleSheetsService.saveToSheet(validNotaires);
+      console.log('Début de la synchronisation complète avec Google Sheets...');
+      // Sync all notaires
+      await googleSheetsService.saveToSheet(this.notaires);
+      console.log('Synchronisation complète avec Google Sheets réussie');
     } catch (error) {
       console.error('Error syncing with Google Sheets:', error);
       throw error;

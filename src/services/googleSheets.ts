@@ -42,6 +42,14 @@ function isError(error: unknown): error is Error {
   return error instanceof Error;
 }
 
+// Fonction utilitaire pour créer une erreur
+function createError(error: unknown): Error {
+  if (isError(error)) {
+    return error;
+  }
+  return new Error(typeof error === 'string' ? error : 'An unknown error occurred');
+}
+
 // Fonction utilitaire pour retry
 async function withRetry<T>(
   operation: () => Promise<T>,
@@ -102,8 +110,8 @@ async function fetchWithCors(url: string, options?: RequestInit): Promise<Respon
     }
 
     return response;
-  } catch (error) {
-    if (error.name === 'AbortError') {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === 'AbortError') {
       throw new Error('API error: Request timed out');
     }
     if (error instanceof TypeError && error.message.includes('CORS')) {
@@ -184,70 +192,79 @@ export const googleSheetsService = {
   },
 
   async saveToSheet(notaire: Notaire | Notaire[]): Promise<void> {
-    return withRetry(async () => {
-      try {
-        const notaires = Array.isArray(notaire) ? notaire : [notaire];
+    try {
+      const notaires = Array.isArray(notaire) ? notaire : [notaire];
 
-        // Valider les données avant l'envoi
-        const validNotaires = notaires.filter(n => {
-          if (!n.id || !n.officeNotarial) {
-            console.warn('Invalid notaire data:', n);
-            return false;
-          }
-          return true;
-        });
-
-        if (validNotaires.length === 0) {
-          throw new Error('API error: No valid notaires to save');
+      // Valider les données avant l'envoi
+      const validNotaires = notaires.filter(n => {
+        if (!n.id || !n.officeNotarial) {
+          console.warn('Invalid notaire data:', n);
+          return false;
         }
+        return true;
+      });
 
-        // Convertir les notaires en tableau de valeurs pour Google Sheets
-        const values = validNotaires.map(notaire => [
-          notaire.id,
-          notaire.officeNotarial,
-          notaire.adresse,
-          notaire.codePostal,
-          notaire.ville,
-          notaire.departement,
-          notaire.email,
-          notaire.notairesAssocies,
-          notaire.notairesSalaries,
-          notaire.nbAssocies,
-          notaire.nbSalaries,
-          notaire.serviceNego ? 'oui' : 'non',
-          notaire.statut,
-          notaire.notes,
-          JSON.stringify(notaire.contacts || []),
-          notaire.dateModification,
-          notaire.latitude,
-          notaire.longitude,
-          notaire.geoScore,
-          JSON.stringify(notaire.geocodingHistory || [])
-        ]);
+      if (validNotaires.length === 0) {
+        throw new Error('No valid notaires to save');
+      }
 
-        const response = await fetchWithCors(`${API_BASE_URL}/sheets`, {
+      // Convertir les notaires en tableau de valeurs pour Google Sheets
+      const values = validNotaires.map(notaire => [
+        notaire.id,
+        notaire.officeNotarial,
+        notaire.adresse,
+        notaire.codePostal,
+        notaire.ville,
+        notaire.departement,
+        notaire.email,
+        notaire.notairesAssocies,
+        notaire.notairesSalaries,
+        notaire.nbAssocies,
+        notaire.nbSalaries,
+        notaire.serviceNego ? 'oui' : 'non',
+        notaire.statut,
+        notaire.notes,
+        JSON.stringify(notaire.contacts || []),
+        notaire.dateModification,
+        notaire.latitude,
+        notaire.longitude,
+        notaire.geoScore,
+        JSON.stringify(notaire.geocodingHistory || [])
+      ]);
+
+      console.log('Envoi des données à Google Sheets...');
+      console.log('Nombre de notaires à sauvegarder:', values.length);
+
+      const response = await withRetry(() => 
+        fetchWithCors(`${API_BASE_URL}/sheets`, {
           method: 'POST',
           body: JSON.stringify({ 
             range: SHEET_RANGES.NOTAIRES,
-            values
+            values,
+            forceSync: true // Indique au serveur de forcer la synchronisation
           }),
-        });
+        })
+      );
 
-        const data = await parseJsonResponse(response);
-        
-        if (data.error) {
-          throw new Error(`API error: ${data.message || 'Failed to save to Google Sheets'}`);
-        }
-
-        if (!data.data || !data.data.updatedRange) {
-          console.warn('Warning: Unexpected API response format:', data);
-        }
-
-      } catch (error) {
-        console.error('Error in saveToSheet:', error);
-        throw error;
+      const data = await parseJsonResponse(response);
+      
+      if (data.error) {
+        console.error('Erreur de réponse API:', data);
+        throw new Error(`API error: ${data.message || 'Failed to save to Google Sheets'}`);
       }
-    });
+
+      if (!data.data || !data.data.updatedRange) {
+        console.warn('Warning: Unexpected API response format:', data);
+      } else {
+        console.log('Données sauvegardées avec succès dans Google Sheets');
+        console.log('Plage mise à jour:', data.data.updatedRange);
+      }
+
+    } catch (err: unknown) {
+      const error = createError(err);
+      console.error('Error in saveToSheet:', error.message);
+      throw error;
+    }
   },
 
   async saveVillesInteret(villesInteret: VilleInteret[]): Promise<void> {
