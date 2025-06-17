@@ -141,14 +141,14 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     const updatedNotaire = {
       ...editedNotaire,
       [name]: value,
-      id: editedNotaire.id, // Forcer l'ID à être conservé
-      dateModification: new Date().toISOString() // Mettre à jour la date de modification
+      id: editedNotaire.id,
+      dateModification: new Date().toISOString()
     };
 
     try {
       // Mettre à jour l'état local
       setEditedNotaire(updatedNotaire);
-      console.log(`Début de la mise à jour du champ ${name} pour le notaire ${updatedNotaire.id}`);
+      console.log(`🔄 Début de la mise à jour du champ ${name} pour le notaire ${updatedNotaire.id}`);
 
       // Synchroniser immédiatement avec Google Sheets
       await notaireService.updateNotaire(updatedNotaire);
@@ -156,10 +156,10 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       // Mettre à jour l'état parent
       onSave(updatedNotaire);
 
-      console.log(`Champ ${name} mis à jour et synchronisé avec succès pour le notaire ${updatedNotaire.id}`);
-      setSaveError(null); // Effacer les erreurs précédentes
+      console.log(`✅ Champ ${name} mis à jour et synchronisé avec succès`);
+      setSaveError(null);
     } catch (error) {
-      console.error('Erreur lors de la synchronisation:', error);
+      console.error('❌ Erreur lors de la synchronisation:', error);
       setSaveError('Erreur lors de la sauvegarde. Veuillez réessayer.');
     }
 
@@ -284,17 +284,23 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   const handleModalClose = async () => {
     try {
       setSaveError(null);
+      console.log('🔄 Synchronisation finale avant fermeture...');
       
       // Synchroniser avec Google Sheets avant de fermer
       await notaireService.updateNotaire(editedNotaire);
       
+      // Forcer une synchronisation complète
+      await notaireService.syncWithGoogleSheets();
+      
       // Mettre à jour l'état parent
       onSave(editedNotaire);
+      
+      console.log('✅ Synchronisation finale réussie');
       
       // Fermer le modal
       onClose();
     } catch (error) {
-      console.error('Erreur lors de la synchronisation finale:', error);
+      console.error('❌ Erreur lors de la synchronisation finale:', error);
       setSaveError('Erreur lors de la sauvegarde. Voulez-vous réessayer avant de fermer ?');
     }
   };

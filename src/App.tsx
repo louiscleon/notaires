@@ -103,17 +103,29 @@ const App: React.FC = () => {
 
   const handleStatutChange = async (notaire: Notaire, newStatut: NotaireStatut) => {
     try {
+      setIsSyncing(true);
       const updatedNotaire = { ...notaire, statut: newStatut };
+      
+      // Mettre à jour via le service
       await notaireService.updateNotaire(updatedNotaire);
+      
+      // Forcer une synchronisation complète
+      await notaireService.syncWithGoogleSheets();
+      
       addToast('Statut mis à jour avec succès', 'success');
     } catch (error) {
       console.error('Erreur lors de la mise à jour du statut:', error);
       addToast('Erreur lors de la mise à jour du statut', 'error');
+    } finally {
+      setIsSyncing(false);
     }
   };
 
   const handleNotaireUpdate = async (updatedNotaire: Notaire) => {
     try {
+      setIsSyncing(true);
+      console.log('🔄 Début de la mise à jour du notaire...');
+
       // Mettre à jour l'état local immédiatement pour une meilleure réactivité
       setNotaires(prevNotaires => {
         const index = prevNotaires.findIndex(n => n.id === updatedNotaire.id);
@@ -126,8 +138,14 @@ const App: React.FC = () => {
 
       // Synchroniser avec le service
       await notaireService.updateNotaire(updatedNotaire);
+      
+      // Forcer une synchronisation complète
+      await notaireService.syncWithGoogleSheets();
+      
+      console.log('✅ Mise à jour et synchronisation réussies');
+      addToast('Modifications enregistrées', 'success');
     } catch (error) {
-      console.error('Erreur lors de la mise à jour du notaire:', error);
+      console.error('❌ Erreur lors de la mise à jour du notaire:', error);
       addToast('Erreur lors de la mise à jour du notaire', 'error');
       
       // En cas d'erreur, restaurer l'état précédent
@@ -142,6 +160,8 @@ const App: React.FC = () => {
         newNotaires[index] = originalNotaire;
         return newNotaires;
       });
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -269,17 +289,19 @@ const App: React.FC = () => {
   useEffect(() => {
     const syncInterval = setInterval(async () => {
       try {
-        await notaireService.syncWithGoogleSheets();
-        console.log('Synchronisation automatique effectuée');
+        if (!isSyncing) {
+          await notaireService.syncWithGoogleSheets();
+          console.log('Synchronisation automatique effectuée');
+        }
       } catch (error) {
         console.error('Erreur lors de la synchronisation automatique:', error);
       }
-    }, 60000); // Synchroniser toutes les 60 secondes au lieu de 15
+    }, 60000); // Synchroniser toutes les 60 secondes
 
     return () => {
       clearInterval(syncInterval);
     };
-  }, []); // Ne dépend plus de selectedNotaire
+  }, [isSyncing]); // Dépend de isSyncing pour éviter les synchronisations simultanées
 
   if (loading) {
     return (
