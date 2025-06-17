@@ -128,7 +128,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     return () => clearTimeout(timeoutId);
   }, [editedNotaire.adresse]);
 
-  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
     // S'assurer que l'ID est toujours présent
@@ -148,10 +148,11 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     if (name === 'adresse') {
       setShowSuggestions(true);
     }
+  };
 
-    // Sauvegarder immédiatement
+  const handleInputBlur = async (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     try {
-      await saveAndSync(updatedNotaire);
+      await saveAndSync(editedNotaire);
     } catch (error) {
       // L'erreur est déjà gérée dans saveAndSync
     }
@@ -339,6 +340,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                                 name="adresse"
                                 value={editedNotaire.adresse}
                                 onChange={handleInputChange}
+                                onBlur={handleInputBlur}
                                 className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 transition-colors duration-200"
                               />
                               {showSuggestions && adresseSuggestions.length > 0 && (
@@ -365,6 +367,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                                   name="codePostal"
                                   value={editedNotaire.codePostal}
                                   onChange={handleInputChange}
+                                  onBlur={handleInputBlur}
                                   className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 transition-colors duration-200"
                                 />
                               </div>
@@ -377,6 +380,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                                   name="ville"
                                   value={editedNotaire.ville}
                                   onChange={handleInputChange}
+                                  onBlur={handleInputBlur}
                                   className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 transition-colors duration-200"
                                 />
                               </div>
@@ -390,6 +394,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                                 name="email"
                                 value={editedNotaire.email || ''}
                                 onChange={handleInputChange}
+                                onBlur={handleInputBlur}
                                 className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 transition-colors duration-200"
                               />
                             </div>
@@ -410,6 +415,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                                 name="nbAssocies"
                                 value={editedNotaire.nbAssocies}
                                 onChange={handleInputChange}
+                                onBlur={handleInputBlur}
                                 min="0"
                                 className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 mb-2 transition-colors duration-200"
                               />
@@ -418,6 +424,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                                 name="notairesAssocies"
                                 value={editedNotaire.notairesAssocies}
                                 onChange={handleInputChange}
+                                onBlur={handleInputBlur}
                                 className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 transition-colors duration-200"
                               />
                             </div>
@@ -430,6 +437,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                                 name="nbSalaries"
                                 value={editedNotaire.nbSalaries}
                                 onChange={handleInputChange}
+                                onBlur={handleInputBlur}
                                 min="0"
                                 className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 mb-2 transition-colors duration-200"
                               />
@@ -438,6 +446,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                                 name="notairesSalaries"
                                 value={editedNotaire.notairesSalaries}
                                 onChange={handleInputChange}
+                                onBlur={handleInputBlur}
                                 className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 transition-colors duration-200"
                               />
                             </div>
@@ -473,6 +482,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                             name="notes"
                             value={editedNotaire.notes || ''}
                             onChange={handleInputChange}
+                            onBlur={handleInputBlur}
                             placeholder="Ajouter des notes..."
                             className="w-full h-[calc(100vh-28rem)] rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 resize-none transition-colors duration-200"
                           />
