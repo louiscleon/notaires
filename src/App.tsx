@@ -250,7 +250,7 @@ const App: React.FC = () => {
       } catch (error) {
         console.error('Erreur lors de la synchronisation automatique:', error);
       }
-    }, 15000); // Synchroniser toutes les 15 secondes
+    }, 60000); // Synchroniser toutes les 60 secondes au lieu de 15
 
     return () => {
       clearInterval(syncInterval);

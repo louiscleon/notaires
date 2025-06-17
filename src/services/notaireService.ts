@@ -34,6 +34,9 @@ class NotaireService {
   private villesInteret: VilleInteret[] = [];
   private subscribers: ((notaires: Notaire[], villesInteret: VilleInteret[]) => void)[] = [];
   private isInitialized: boolean = false;
+  private pendingUpdates: Set<string> = new Set(); // Pour stocker les IDs des notaires à mettre à jour
+  private syncTimeout: NodeJS.Timeout | null = null;
+  private readonly SYNC_DELAY = 5000; // 5 secondes de délai entre les synchronisations
 
   // Singleton instance
   private static instance: NotaireService;
@@ -150,15 +153,16 @@ class NotaireService {
       // Update the modification date
       updatedNotaire.dateModification = new Date().toISOString();
 
-      // Sync with Google Sheets first and wait for completion
-      console.log('Début de la synchronisation avec Google Sheets...', updatedNotaire.id);
-      await googleSheetsService.saveToSheet(updatedNotaire);
-      console.log('Synchronisation avec Google Sheets réussie pour', updatedNotaire.id);
-
-      // Only update local state if Google Sheets sync was successful
+      // Update local state immediately
       const index = this.notaires.findIndex(n => n.id === updatedNotaire.id);
       this.notaires[index] = updatedNotaire;
       this.notifySubscribers();
+
+      // Add to pending updates
+      this.pendingUpdates.add(updatedNotaire.id);
+
+      // Schedule sync if not already scheduled
+      this.scheduleSyncWithGoogleSheets();
       
       console.log('État local mis à jour avec succès pour', updatedNotaire.id);
     } catch (error) {
@@ -173,6 +177,64 @@ class NotaireService {
         this.notifySubscribers();
         console.log('État local restauré après erreur pour', updatedNotaire.id);
       }
+      throw error;
+    }
+  }
+
+  private scheduleSyncWithGoogleSheets(): void {
+    // Clear existing timeout if any
+    if (this.syncTimeout) {
+      clearTimeout(this.syncTimeout);
+    }
+
+    // Schedule new sync
+    this.syncTimeout = setTimeout(async () => {
+      try {
+        if (this.pendingUpdates.size > 0) {
+          console.log(`Synchronisation de ${this.pendingUpdates.size} notaires...`);
+          const notairesToSync = this.notaires.filter(n => this.pendingUpdates.has(n.id));
+          await googleSheetsService.saveToSheet(notairesToSync);
+          this.pendingUpdates.clear();
+          console.log('Synchronisation groupée réussie');
+        }
+      } catch (error) {
+        console.error('Erreur lors de la synchronisation groupée:', error);
+      }
+    }, this.SYNC_DELAY);
+  }
+
+  // Force sync with Google Sheets
+  async syncWithGoogleSheets(): Promise<void> {
+    if (!this.isInitialized) {
+      throw new Error('NotaireService is not initialized');
+    }
+
+    try {
+      console.log('Début de la synchronisation complète avec Google Sheets...');
+      
+      // Mettre à jour la date de modification pour tous les notaires
+      const notairesWithUpdatedDates = this.notaires.map(notaire => ({
+        ...notaire,
+        dateModification: new Date().toISOString()
+      }));
+
+      // Sync all notaires with force sync flag
+      await googleSheetsService.saveToSheet(notairesWithUpdatedDates);
+      
+      // Update local state
+      this.notaires = notairesWithUpdatedDates;
+      this.notifySubscribers();
+      
+      // Clear any pending updates since we just synced everything
+      this.pendingUpdates.clear();
+      if (this.syncTimeout) {
+        clearTimeout(this.syncTimeout);
+        this.syncTimeout = null;
+      }
+      
+      console.log('Synchronisation complète avec Google Sheets réussie');
+    } catch (error) {
+      console.error('Error syncing with Google Sheets:', error);
       throw error;
     }
   }
@@ -208,41 +270,17 @@ class NotaireService {
     }
   }
 
-  // Force sync with Google Sheets
-  async syncWithGoogleSheets(): Promise<void> {
-    if (!this.isInitialized) {
-      throw new Error('NotaireService is not initialized');
-    }
-
-    try {
-      console.log('Début de la synchronisation complète avec Google Sheets...');
-      
-      // Mettre à jour la date de modification pour tous les notaires
-      const notairesWithUpdatedDates = this.notaires.map(notaire => ({
-        ...notaire,
-        dateModification: new Date().toISOString()
-      }));
-
-      // Sync all notaires with force sync flag
-      await googleSheetsService.saveToSheet(notairesWithUpdatedDates);
-      
-      // Update local state
-      this.notaires = notairesWithUpdatedDates;
-      this.notifySubscribers();
-      
-      console.log('Synchronisation complète avec Google Sheets réussie');
-    } catch (error) {
-      console.error('Error syncing with Google Sheets:', error);
-      throw error;
-    }
-  }
-
   // Reset service (useful for testing)
   reset(): void {
     this.notaires = [];
     this.villesInteret = [];
     this.subscribers = [];
     this.isInitialized = false;
+    this.pendingUpdates.clear();
+    if (this.syncTimeout) {
+      clearTimeout(this.syncTimeout);
+      this.syncTimeout = null;
+    }
   }
 }
 
