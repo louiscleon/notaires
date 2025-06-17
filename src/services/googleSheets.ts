@@ -133,6 +133,115 @@ async function parseJsonResponse(response: Response): Promise<any> {
   }
 }
 
+// Queue de mise à jour
+let updateQueue: Array<{
+  notaire: Notaire | Notaire[];
+  resolve: (value: void | PromiseLike<void>) => void;
+  reject: (reason?: any) => void;
+}> = [];
+let isProcessingQueue = false;
+
+// Fonction pour traiter la queue
+async function processUpdateQueue() {
+  if (isProcessingQueue || updateQueue.length === 0) return;
+  
+  isProcessingQueue = true;
+  console.log(`🔄 Traitement de la queue de mise à jour (${updateQueue.length} éléments)`);
+
+  try {
+    const item = updateQueue[0];
+    await saveToSheetInternal(item.notaire);
+    item.resolve();
+    updateQueue.shift();
+    console.log('✅ Mise à jour réussie, élément retiré de la queue');
+  } catch (error) {
+    console.error('❌ Erreur lors du traitement de la queue:', error);
+    const item = updateQueue[0];
+    item.reject(error);
+    updateQueue.shift();
+  } finally {
+    isProcessingQueue = false;
+    if (updateQueue.length > 0) {
+      setTimeout(processUpdateQueue, 1000); // Attendre 1 seconde avant de traiter le prochain élément
+    }
+  }
+}
+
+// Fonction interne pour sauvegarder dans Google Sheets
+async function saveToSheetInternal(notaire: Notaire | Notaire[]): Promise<void> {
+  const notaires = Array.isArray(notaire) ? notaire : [notaire];
+
+  // Valider les données avant l'envoi
+  const validNotaires = notaires.filter(n => {
+    if (!n.id || !n.officeNotarial) {
+      console.warn('Invalid notaire data:', n);
+      return false;
+    }
+    return true;
+  });
+
+  if (validNotaires.length === 0) {
+    throw new Error('No valid notaires to save');
+  }
+
+  // Convertir les notaires en tableau de valeurs pour Google Sheets
+  const values = validNotaires.map(notaire => [
+    notaire.id,
+    notaire.officeNotarial,
+    notaire.adresse,
+    notaire.codePostal,
+    notaire.ville,
+    notaire.departement,
+    notaire.email,
+    notaire.notairesAssocies,
+    notaire.notairesSalaries,
+    notaire.nbAssocies,
+    notaire.nbSalaries,
+    notaire.serviceNego ? 'oui' : 'non',
+    notaire.statut,
+    notaire.notes,
+    JSON.stringify(notaire.contacts || []),
+    notaire.dateModification,
+    notaire.latitude,
+    notaire.longitude,
+    notaire.geoScore,
+    JSON.stringify(notaire.geocodingHistory || [])
+  ]);
+
+  console.log('Envoi des données à Google Sheets...');
+  console.log('Nombre de notaires à sauvegarder:', values.length);
+
+  const timestamp = new Date().getTime();
+  
+  const response = await withRetry(
+    () => fetchWithCors(`${API_BASE_URL}/sheets`, {
+      method: 'POST',
+      body: JSON.stringify({ 
+        range: SHEET_RANGES.NOTAIRES,
+        values,
+        forceSync: true,
+        timestamp
+      }),
+    }),
+    5,
+    2000
+  );
+
+  const data = await parseJsonResponse(response);
+  
+  if (data.error) {
+    console.error('Erreur de réponse API:', data);
+    throw new Error(`API error: ${data.message || 'Failed to save to Google Sheets'}`);
+  }
+
+  if (!data.data || !data.data.updatedRange) {
+    console.warn('Warning: Unexpected API response format:', data);
+  } else {
+    console.log('Données sauvegardées avec succès dans Google Sheets');
+    console.log('Plage mise à jour:', data.data.updatedRange);
+  }
+}
+
 export const googleSheetsService = {
   async loadFromSheet(): Promise<SheetData> {
     return withRetry(async () => {
@@ -192,94 +301,10 @@ export const googleSheetsService = {
   },
 
   async saveToSheet(notaire: Notaire | Notaire[]): Promise<void> {
-    try {
-      const notaires = Array.isArray(notaire) ? notaire : [notaire];
-
-      // Valider les données avant l'envoi
-      const validNotaires = notaires.filter(n => {
-        if (!n.id || !n.officeNotarial) {
-          console.warn('Invalid notaire data:', n);
-          return false;
-        }
-        return true;
-      });
-
-      if (validNotaires.length === 0) {
-        throw new Error('No valid notaires to save');
-      }
-
-      // Convertir les notaires en tableau de valeurs pour Google Sheets
-      const values = validNotaires.map(notaire => [
-        notaire.id,
-        notaire.officeNotarial,
-        notaire.adresse,
-        notaire.codePostal,
-        notaire.ville,
-        notaire.departement,
-        notaire.email,
-        notaire.notairesAssocies,
-        notaire.notairesSalaries,
-        notaire.nbAssocies,
-        notaire.nbSalaries,
-        notaire.serviceNego ? 'oui' : 'non',
-        notaire.statut,
-        notaire.notes,
-        JSON.stringify(notaire.contacts || []),
-        notaire.dateModification,
-        notaire.latitude,
-        notaire.longitude,
-        notaire.geoScore,
-        JSON.stringify(notaire.geocodingHistory || [])
-      ]);
-
-      console.log('Envoi des données à Google Sheets...');
-      console.log('Nombre de notaires à sauvegarder:', values.length);
-
-      // Ajouter un timestamp pour forcer le rafraîchissement
-      const timestamp = new Date().getTime();
-      
-      // Utiliser withRetry avec un délai plus long pour les quotas
-      const response = await withRetry(
-        () => fetchWithCors(`${API_BASE_URL}/sheets`, {
-          method: 'POST',
-          body: JSON.stringify({ 
-            range: SHEET_RANGES.NOTAIRES,
-            values,
-            forceSync: true,
-            timestamp
-          }),
-        }),
-        5, // 5 tentatives
-        2000 // 2 secondes entre chaque tentative
-      );
-
-      const data = await parseJsonResponse(response);
-      
-      if (data.error) {
-        console.error('Erreur de réponse API:', data);
-        throw new Error(`API error: ${data.message || 'Failed to save to Google Sheets'}`);
-      }
-
-      if (!data.data || !data.data.updatedRange) {
-        console.warn('Warning: Unexpected API response format:', data);
-      } else {
-        console.log('Données sauvegardées avec succès dans Google Sheets');
-        console.log('Plage mise à jour:', data.data.updatedRange);
-      }
-
-    } catch (err: unknown) {
-      const error = createError(err);
-      console.error('Error in saveToSheet:', error.message);
-      
-      // Si l'erreur est liée au quota, on attend plus longtemps avant de réessayer
-      if (error.message.includes('Quota exceeded')) {
-        console.log('Quota dépassé, attente de 5 secondes avant de réessayer...');
-        await wait(5000);
-        throw new RetryableError('Quota exceeded, retrying...');
-      }
-      
-      throw error;
-    }
+    return new Promise((resolve, reject) => {
+      updateQueue.push({ notaire, resolve, reject });
+      processUpdateQueue();
+    });
   },
 
   async saveVillesInteret(villesInteret: VilleInteret[]): Promise<void> {

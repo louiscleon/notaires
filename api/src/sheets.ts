@@ -1,11 +1,45 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sheets, SPREADSHEET_ID } from './config';
 
+// Mécanisme de verrouillage simple
+let isWriteLocked = false;
+let writeQueue: Array<() => Promise<any>> = [];
+const LOCK_TIMEOUT = 10000; // 10 secondes maximum de verrouillage
+
 function safeStringify(obj: any): string {
   try {
     return JSON.stringify(obj, null, 2);
   } catch (e) {
     return '[Cannot stringify object]';
+  }
+}
+
+async function processWriteQueue() {
+  if (isWriteLocked || writeQueue.length === 0) return;
+  
+  isWriteLocked = true;
+  console.log(`Processing write queue (${writeQueue.length} items)`);
+  
+  // Set a timeout to release the lock in case of errors
+  const timeoutId = setTimeout(() => {
+    console.log('Write lock timeout reached, releasing lock');
+    isWriteLocked = false;
+    processWriteQueue();
+  }, LOCK_TIMEOUT);
+  
+  try {
+    const operation = writeQueue[0];
+    await operation();
+    writeQueue.shift();
+  } catch (error) {
+    console.error('Error processing write queue:', error);
+  } finally {
+    clearTimeout(timeoutId);
+    isWriteLocked = false;
+    if (writeQueue.length > 0) {
+      // Wait a bit before processing next item
+      setTimeout(processWriteQueue, 1000);
+    }
   }
 }
 
@@ -93,39 +127,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
         }
 
-        console.log('Writing data:', {
-          range: writeRange,
-          valueCount: values.length,
-          spreadsheetId: SPREADSHEET_ID,
-          firstRow: values[0],
-          lastRow: values[values.length - 1]
+        return new Promise((resolve) => {
+          const operation = async () => {
+            try {
+              console.log('Writing data:', {
+                range: writeRange,
+                valueCount: values.length,
+                spreadsheetId: SPREADSHEET_ID,
+                firstRow: values[0],
+                lastRow: values[values.length - 1]
+              });
+
+              const writeResponse = await sheets.spreadsheets.values.update({
+                spreadsheetId: SPREADSHEET_ID,
+                range: writeRange,
+                valueInputOption: 'USER_ENTERED',
+                requestBody: { values },
+              });
+
+              console.log('Data written successfully:', safeStringify(writeResponse.data));
+              resolve(res.status(200).json({
+                error: false,
+                data: writeResponse.data
+              }));
+            } catch (e) {
+              const error = e as Error;
+              console.error('Google Sheets API Error:', {
+                message: error.message,
+                stack: error.stack,
+                error: safeStringify(error)
+              });
+              resolve(res.status(500).json({
+                error: true,
+                message: `Google Sheets API Error: ${error.message || 'Failed to write data'}`
+              }));
+            }
+          };
+
+          writeQueue.push(operation);
+          processWriteQueue();
         });
-
-        try {
-          const writeResponse = await sheets.spreadsheets.values.update({
-            spreadsheetId: SPREADSHEET_ID,
-            range: writeRange,
-            valueInputOption: 'USER_ENTERED',
-            requestBody: { values },
-          });
-
-          console.log('Data written successfully:', safeStringify(writeResponse.data));
-          return res.status(200).json({
-            error: false,
-            data: writeResponse.data
-          });
-        } catch (e) {
-          const error = e as Error;
-          console.error('Google Sheets API Error:', {
-            message: error.message,
-            stack: error.stack,
-            error: safeStringify(error)
-          });
-          return res.status(500).json({
-            error: true,
-            message: `Google Sheets API Error: ${error.message || 'Failed to write data'}`
-          });
-        }
       }
 
       default:

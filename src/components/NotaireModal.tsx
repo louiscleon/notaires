@@ -150,17 +150,23 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       setEditedNotaire(updatedNotaire);
       console.log(`Début de la mise à jour du champ ${name} pour le notaire ${updatedNotaire.id}`);
 
-      // Synchroniser immédiatement avec Google Sheets
+      // Synchroniser avec Google Sheets via le service notaire
       await notaireService.updateNotaire(updatedNotaire);
       
       // Mettre à jour l'état parent
       onSave(updatedNotaire);
+
+      // Forcer une synchronisation immédiate avec Google Sheets
+      await notaireService.syncWithGoogleSheets();
 
       console.log(`Champ ${name} mis à jour et synchronisé avec succès pour le notaire ${updatedNotaire.id}`);
       setSaveError(null); // Effacer les erreurs précédentes
     } catch (error) {
       console.error('Erreur lors de la synchronisation:', error);
       setSaveError('Erreur lors de la sauvegarde. Veuillez réessayer.');
+      
+      // Restaurer l'état précédent en cas d'erreur
+      setEditedNotaire(notaire);
     }
 
     if (name === 'adresse') {
@@ -245,23 +251,30 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     const updatedNotaire = {
       ...editedNotaire,
       id: editedNotaire.id,
-      statut: value
+      statut: value,
+      dateModification: new Date().toISOString()
     };
 
     try {
       // Mettre à jour l'état local
       setEditedNotaire(updatedNotaire);
 
-      // Synchroniser immédiatement avec Google Sheets
+      // Synchroniser avec Google Sheets
       await notaireService.updateNotaire(updatedNotaire);
+      
+      // Forcer une synchronisation immédiate
+      await notaireService.syncWithGoogleSheets();
       
       // Mettre à jour l'état parent
       onSave(updatedNotaire);
 
       console.log(`Statut mis à jour et synchronisé: ${value}`);
+      setSaveError(null);
     } catch (error) {
       console.error('Erreur lors de la synchronisation:', error);
       setSaveError('Erreur lors de la sauvegarde. Veuillez réessayer.');
+      // Restaurer l'état précédent en cas d'erreur
+      setEditedNotaire(editedNotaire);
     }
   };
 
@@ -285,11 +298,18 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     try {
       setSaveError(null);
       
-      // Synchroniser avec Google Sheets avant de fermer
-      await notaireService.updateNotaire(editedNotaire);
+      // Vérifier s'il y a eu des modifications
+      const hasChanges = JSON.stringify(notaire) !== JSON.stringify(editedNotaire);
       
-      // Mettre à jour l'état parent
-      onSave(editedNotaire);
+      if (hasChanges) {
+        console.log('Modifications détectées, synchronisation avant fermeture...');
+        // Synchroniser avec Google Sheets avant de fermer
+        await notaireService.updateNotaire(editedNotaire);
+        // Forcer une synchronisation immédiate
+        await notaireService.syncWithGoogleSheets();
+        // Mettre à jour l'état parent
+        onSave(editedNotaire);
+      }
       
       // Fermer le modal
       onClose();
