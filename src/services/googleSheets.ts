@@ -235,13 +235,17 @@ export const googleSheetsService = {
       console.log('Envoi des données à Google Sheets...');
       console.log('Nombre de notaires à sauvegarder:', values.length);
 
+      // Ajouter un timestamp pour forcer le rafraîchissement
+      const timestamp = new Date().getTime();
+      
       const response = await withRetry(() => 
         fetchWithCors(`${API_BASE_URL}/sheets`, {
           method: 'POST',
           body: JSON.stringify({ 
             range: SHEET_RANGES.NOTAIRES,
             values,
-            forceSync: true // Indique au serveur de forcer la synchronisation
+            forceSync: true,
+            timestamp // Ajouter le timestamp pour éviter la mise en cache
           }),
         })
       );

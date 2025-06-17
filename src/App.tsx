@@ -244,19 +244,18 @@ const App: React.FC = () => {
   // Synchroniser périodiquement
   useEffect(() => {
     const syncInterval = setInterval(async () => {
-      if (selectedNotaire) {
-        try {
-          await notaireService.syncWithGoogleSheets();
-        } catch (error) {
-          console.error('Erreur lors de la synchronisation automatique:', error);
-        }
+      try {
+        await notaireService.syncWithGoogleSheets();
+        console.log('Synchronisation automatique effectuée');
+      } catch (error) {
+        console.error('Erreur lors de la synchronisation automatique:', error);
       }
-    }, 30000); // Synchroniser toutes les 30 secondes si un notaire est sélectionné
+    }, 15000); // Synchroniser toutes les 15 secondes
 
     return () => {
       clearInterval(syncInterval);
     };
-  }, [selectedNotaire]);
+  }, []); // Ne dépend plus de selectedNotaire
 
   if (loading) {
     return (

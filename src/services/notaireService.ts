@@ -216,8 +216,20 @@ class NotaireService {
 
     try {
       console.log('Début de la synchronisation complète avec Google Sheets...');
-      // Sync all notaires
-      await googleSheetsService.saveToSheet(this.notaires);
+      
+      // Mettre à jour la date de modification pour tous les notaires
+      const notairesWithUpdatedDates = this.notaires.map(notaire => ({
+        ...notaire,
+        dateModification: new Date().toISOString()
+      }));
+
+      // Sync all notaires with force sync flag
+      await googleSheetsService.saveToSheet(notairesWithUpdatedDates);
+      
+      // Update local state
+      this.notaires = notairesWithUpdatedDates;
+      this.notifySubscribers();
+      
       console.log('Synchronisation complète avec Google Sheets réussie');
     } catch (error) {
       console.error('Error syncing with Google Sheets:', error);
