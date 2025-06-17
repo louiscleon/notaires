@@ -238,16 +238,19 @@ export const googleSheetsService = {
       // Ajouter un timestamp pour forcer le rafraîchissement
       const timestamp = new Date().getTime();
       
-      const response = await withRetry(() => 
-        fetchWithCors(`${API_BASE_URL}/sheets`, {
+      // Utiliser withRetry avec un délai plus long pour les quotas
+      const response = await withRetry(
+        () => fetchWithCors(`${API_BASE_URL}/sheets`, {
           method: 'POST',
           body: JSON.stringify({ 
             range: SHEET_RANGES.NOTAIRES,
             values,
             forceSync: true,
-            timestamp // Ajouter le timestamp pour éviter la mise en cache
+            timestamp
           }),
-        })
+        }),
+        5, // 5 tentatives
+        2000 // 2 secondes entre chaque tentative
       );
 
       const data = await parseJsonResponse(response);
@@ -267,6 +270,14 @@ export const googleSheetsService = {
     } catch (err: unknown) {
       const error = createError(err);
       console.error('Error in saveToSheet:', error.message);
+      
+      // Si l'erreur est liée au quota, on attend plus longtemps avant de réessayer
+      if (error.message.includes('Quota exceeded')) {
+        console.log('Quota dépassé, attente de 5 secondes avant de réessayer...');
+        await wait(5000);
+        throw new RetryableError('Quota exceeded, retrying...');
+      }
+      
       throw error;
     }
   },

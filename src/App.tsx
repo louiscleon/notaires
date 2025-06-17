@@ -114,10 +114,34 @@ const App: React.FC = () => {
 
   const handleNotaireUpdate = async (updatedNotaire: Notaire) => {
     try {
+      // Mettre à jour l'état local immédiatement pour une meilleure réactivité
+      setNotaires(prevNotaires => {
+        const index = prevNotaires.findIndex(n => n.id === updatedNotaire.id);
+        if (index === -1) return prevNotaires;
+        
+        const newNotaires = [...prevNotaires];
+        newNotaires[index] = updatedNotaire;
+        return newNotaires;
+      });
+
+      // Synchroniser avec le service
       await notaireService.updateNotaire(updatedNotaire);
     } catch (error) {
       console.error('Erreur lors de la mise à jour du notaire:', error);
       addToast('Erreur lors de la mise à jour du notaire', 'error');
+      
+      // En cas d'erreur, restaurer l'état précédent
+      setNotaires(prevNotaires => {
+        const originalNotaire = prevNotaires.find(n => n.id === updatedNotaire.id);
+        if (!originalNotaire) return prevNotaires;
+        
+        const index = prevNotaires.findIndex(n => n.id === updatedNotaire.id);
+        if (index === -1) return prevNotaires;
+        
+        const newNotaires = [...prevNotaires];
+        newNotaires[index] = originalNotaire;
+        return newNotaires;
+      });
     }
   };
 

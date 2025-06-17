@@ -192,13 +192,34 @@ class NotaireService {
       try {
         if (this.pendingUpdates.size > 0) {
           console.log(`Synchronisation de ${this.pendingUpdates.size} notaires...`);
-          const notairesToSync = this.notaires.filter(n => this.pendingUpdates.has(n.id));
+          
+          // Mettre à jour la date de modification pour tous les notaires à synchroniser
+          const notairesToSync = this.notaires
+            .filter(n => this.pendingUpdates.has(n.id))
+            .map(n => ({
+              ...n,
+              dateModification: new Date().toISOString()
+            }));
+
+          // Forcer la synchronisation immédiate
           await googleSheetsService.saveToSheet(notairesToSync);
+          
+          // Mettre à jour l'état local avec les nouvelles dates
+          notairesToSync.forEach(updatedNotaire => {
+            const index = this.notaires.findIndex(n => n.id === updatedNotaire.id);
+            if (index !== -1) {
+              this.notaires[index] = updatedNotaire;
+            }
+          });
+          
           this.pendingUpdates.clear();
+          this.notifySubscribers();
           console.log('Synchronisation groupée réussie');
         }
       } catch (error) {
         console.error('Erreur lors de la synchronisation groupée:', error);
+        // En cas d'erreur, on réessaie dans 5 secondes
+        setTimeout(() => this.scheduleSyncWithGoogleSheets(), 5000);
       }
     }, this.SYNC_DELAY);
   }
@@ -223,7 +244,6 @@ class NotaireService {
       
       // Update local state
       this.notaires = notairesWithUpdatedDates;
-      this.notifySubscribers();
       
       // Clear any pending updates since we just synced everything
       this.pendingUpdates.clear();
@@ -232,6 +252,7 @@ class NotaireService {
         this.syncTimeout = null;
       }
       
+      this.notifySubscribers();
       console.log('Synchronisation complète avec Google Sheets réussie');
     } catch (error) {
       console.error('Error syncing with Google Sheets:', error);
