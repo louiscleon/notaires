@@ -286,16 +286,21 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       setSaveError(null);
       console.log('🔄 Synchronisation finale avant fermeture...');
       
-      // Synchroniser avec Google Sheets avant de fermer
-      await notaireService.updateNotaire(editedNotaire);
+      // Vérifier s'il y a eu des modifications
+      const hasChanges = JSON.stringify(notaire) !== JSON.stringify(editedNotaire);
       
-      // Forcer une synchronisation complète
-      await notaireService.syncWithGoogleSheets();
-      
-      // Mettre à jour l'état parent
-      onSave(editedNotaire);
-      
-      console.log('✅ Synchronisation finale réussie');
+      if (hasChanges) {
+        // Synchroniser avec Google Sheets avant de fermer
+        await notaireService.updateNotaire(editedNotaire);
+        
+        // Forcer une synchronisation complète
+        await notaireService.syncWithGoogleSheets();
+        
+        // Mettre à jour l'état parent
+        onSave(editedNotaire);
+        
+        console.log('✅ Synchronisation finale réussie');
+      }
       
       // Fermer le modal
       onClose();

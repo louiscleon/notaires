@@ -84,43 +84,6 @@ const App: React.FC = () => {
     storageService.saveFiltres(filtres);
   }, [filtres]);
 
-  const synchronize = async () => {
-    try {
-      setIsSyncing(true);
-      await notaireService.syncWithGoogleSheets();
-      addToast('Synchronisation réussie', 'success');
-    } catch (error) {
-      console.error('Erreur lors de la synchronisation:', error);
-      addToast('Erreur lors de la synchronisation', 'error');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  const handleNotaireClick = (notaire: Notaire) => {
-    setSelectedNotaire(notaire);
-  };
-
-  const handleStatutChange = async (notaire: Notaire, newStatut: NotaireStatut) => {
-    try {
-      setIsSyncing(true);
-      const updatedNotaire = { ...notaire, statut: newStatut };
-      
-      // Mettre à jour via le service
-      await notaireService.updateNotaire(updatedNotaire);
-      
-      // Forcer une synchronisation complète
-      await notaireService.syncWithGoogleSheets();
-      
-      addToast('Statut mis à jour avec succès', 'success');
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour du statut:', error);
-      addToast('Erreur lors de la mise à jour du statut', 'error');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
   const handleNotaireUpdate = async (updatedNotaire: Notaire) => {
     try {
       setIsSyncing(true);
@@ -143,7 +106,7 @@ const App: React.FC = () => {
       await notaireService.syncWithGoogleSheets();
       
       console.log('✅ Mise à jour et synchronisation réussies');
-      addToast('Modifications enregistrées', 'success');
+      // La notification est maintenant gérée par le composant qui a initié la modification
     } catch (error) {
       console.error('❌ Erreur lors de la mise à jour du notaire:', error);
       addToast('Erreur lors de la mise à jour du notaire', 'error');
@@ -292,16 +255,57 @@ const App: React.FC = () => {
         if (!isSyncing) {
           await notaireService.syncWithGoogleSheets();
           console.log('Synchronisation automatique effectuée');
+          // Ne pas afficher de notification pour les synchronisations automatiques
         }
       } catch (error) {
         console.error('Erreur lors de la synchronisation automatique:', error);
+        // Afficher une notification uniquement en cas d'erreur
+        addToast('Erreur lors de la synchronisation automatique', 'error');
       }
-    }, 60000); // Synchroniser toutes les 60 secondes
+    }, 60000);
 
     return () => {
       clearInterval(syncInterval);
     };
-  }, [isSyncing]); // Dépend de isSyncing pour éviter les synchronisations simultanées
+  }, [isSyncing]);
+
+  const synchronize = async () => {
+    try {
+      setIsSyncing(true);
+      await notaireService.syncWithGoogleSheets();
+      // Afficher une notification uniquement pour la synchronisation manuelle
+      addToast('Synchronisation réussie', 'success');
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation:', error);
+      addToast('Erreur lors de la synchronisation', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleNotaireClick = (notaire: Notaire) => {
+    setSelectedNotaire(notaire);
+  };
+
+  const handleStatutChange = async (notaire: Notaire, newStatut: NotaireStatut) => {
+    try {
+      setIsSyncing(true);
+      const updatedNotaire = { ...notaire, statut: newStatut };
+      
+      // Mettre à jour via le service
+      await notaireService.updateNotaire(updatedNotaire);
+      
+      // Forcer une synchronisation complète
+      await notaireService.syncWithGoogleSheets();
+      
+      addToast('Statut mis à jour avec succès', 'success');
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du statut:', error);
+      addToast('Erreur lors de la mise à jour du statut', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   if (loading) {
     return (
