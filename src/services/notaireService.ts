@@ -148,21 +148,14 @@ class NotaireService {
       // Update the modification date
       updatedNotaire.dateModification = new Date().toISOString();
 
-      // Update local state
+      // Sync with Google Sheets first
+      await googleSheetsService.saveToSheet(updatedNotaire);
+
+      // Only update local state if Google Sheets sync was successful
       const index = this.notaires.findIndex(n => n.id === updatedNotaire.id);
       this.notaires[index] = updatedNotaire;
-      
-      // Sync immediately with Google Sheets
-      await googleSheetsService.saveToSheet(updatedNotaire);
-      
-      // Notify subscribers only after successful sync
       this.notifySubscribers();
     } catch (error) {
-      // Restaurer l'état précédent en cas d'erreur
-      const index = this.notaires.findIndex(n => n.id === updatedNotaire.id);
-      this.notaires[index] = originalNotaire;
-      this.notifySubscribers();
-
       console.error('Error updating notaire:', error);
       throw error;
     }

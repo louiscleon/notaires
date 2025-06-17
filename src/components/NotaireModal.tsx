@@ -151,10 +151,28 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   };
 
   const handleInputBlur = async (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    
+    // S'assurer que l'ID est toujours présent
+    if (!editedNotaire.id) {
+      console.error('ID du notaire manquant');
+      setSaveError('Erreur : ID du notaire manquant');
+      return;
+    }
+
     try {
-      await saveAndSync(editedNotaire);
+      setSaveError(null);
+      
+      // Mettre à jour le service (qui synchronisera avec Google Sheets)
+      await notaireService.updateNotaire(editedNotaire);
+      
+      // Mettre à jour l'état parent
+      onSave(editedNotaire);
+
+      console.log(`Champ ${name} mis à jour et synchronisé avec Google Sheets: ${value}`);
     } catch (error) {
-      // L'erreur est déjà gérée dans saveAndSync
+      console.error('Erreur lors de la synchronisation:', error);
+      setSaveError('Erreur lors de la sauvegarde. Veuillez réessayer.');
     }
   };
 
@@ -208,7 +226,16 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       [name]: checked
     };
     setEditedNotaire(updatedNotaire);
-    await saveAndSync(updatedNotaire);
+
+    try {
+      setSaveError(null);
+      await notaireService.updateNotaire(updatedNotaire);
+      onSave(updatedNotaire);
+      console.log(`Case à cocher ${name} mise à jour et synchronisée avec Google Sheets: ${checked}`);
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation:', error);
+      setSaveError('Erreur lors de la sauvegarde. Veuillez réessayer.');
+    }
   };
 
   const handleStatusChange = async (value: NotaireStatut) => {
@@ -224,7 +251,16 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       statut: value
     };
     setEditedNotaire(updatedNotaire);
-    await saveAndSync(updatedNotaire);
+
+    try {
+      setSaveError(null);
+      await notaireService.updateNotaire(updatedNotaire);
+      onSave(updatedNotaire);
+      console.log(`Statut mis à jour et synchronisé avec Google Sheets: ${value}`);
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation:', error);
+      setSaveError('Erreur lors de la sauvegarde. Veuillez réessayer.');
+    }
   };
 
   const saveAndSync = async (updatedNotaire: Notaire) => {
