@@ -5,7 +5,7 @@ import { searchAdresse } from '../services/adresse';
 import ContactHistory from './ContactHistory';
 import { Dialog, Transition, Listbox } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/24/solid';
-import { googleSheetsService } from '../services/googleSheets';
+import { notaireService } from '../services/notaireService';
 
 interface Props {
   isOpen: boolean;
@@ -233,10 +233,14 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
   const saveAndSync = async (updatedNotaire: Notaire) => {
     try {
       setSaveError(null);
+      
+      // Update through the service which handles both local state and Google Sheets sync
+      await notaireService.updateNotaire(updatedNotaire);
+      
+      // Call onSave to update parent component state
       onSave(updatedNotaire);
-      await googleSheetsService.saveToSheet(updatedNotaire);
     } catch (error) {
-      console.error('Erreur lors de la synchronisation avec Google Sheets:', error);
+      console.error('Erreur lors de la synchronisation:', error);
       setSaveError('Erreur lors de la sauvegarde. Les modifications seront perdues au rechargement de la page.');
     }
   };

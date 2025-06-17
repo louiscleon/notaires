@@ -8,10 +8,10 @@ import NotairesTable from './components/NotairesTable';
 import { storageService } from './services/storage';
 import './App.css';
 import Dashboard from './components/Dashboard';
-import { googleSheetsService } from './services/googleSheets';
 import Toast from './components/Toast';
 import { geocodeAddress } from './services/geocoding';
 import Logo from './components/Logo';
+import { notaireService } from './services/notaireService';
 
 interface ToastMessage {
   message: string;
@@ -40,23 +40,34 @@ const App: React.FC = () => {
     setToasts(current => current.filter(toast => toast.id !== id));
   };
 
-  // Charger les filtres sauvegardés au démarrage
+  // Charger les données initiales
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Charger les données depuis le stockage local
-        const savedData = storageService.loadData();
+        setLoading(true);
+        setError(null);
+
+        // Initialiser le service notaire
+        await notaireService.loadInitialData();
         
-        // Charger les données depuis Google Sheets
-        const googleSheetsData = await googleSheetsService.loadFromSheet();
-        
-        // Mettre à jour les filtres
-        setFiltres({
-          ...savedData.filtres,
-          villesInteret: googleSheetsData.villesInteret || []
+        // S'abonner aux changements
+        const unsubscribe = notaireService.subscribe((updatedNotaires) => {
+          setNotaires(updatedNotaires);
         });
+
+        // Charger les filtres
+        const savedData = storageService.loadData();
+        setFiltres(prevFiltres => ({
+          ...prevFiltres,
+          ...savedData.filtres
+        }));
+
+        setLoading(false);
+        return unsubscribe;
       } catch (error) {
         console.error('Erreur lors du chargement des données:', error);
+        setError('Une erreur est survenue lors du chargement des données. Veuillez réessayer.');
+        setLoading(false);
       }
     };
 
@@ -68,114 +79,41 @@ const App: React.FC = () => {
     storageService.saveFiltres(filtres);
   }, [filtres]);
 
-  // Charger les données
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        
-        // Charger d'abord rapidement les données brutes depuis Google Sheets
-        console.log('Chargement initial des données...');
-        const response = await googleSheetsService.loadFromSheet();
-        
-        // Analyser les données chargées
-        console.log('Analyse des données chargées:', {
-          total: response.notaires.length,
-          parDepartement: response.notaires.reduce((acc, n) => {
-            const dept = n.departement?.trim().substring(0, 2) || 'inconnu';
-            acc[dept] = (acc[dept] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>)
-        });
-
-        // Vérifier les doublons potentiels
-        const officeMap = new Map<string, string[]>();
-        response.notaires.forEach(n => {
-          const key = `${n.officeNotarial}_${n.ville}`.toLowerCase();
-          if (!officeMap.has(key)) {
-            officeMap.set(key, []);
-          }
-          officeMap.get(key)?.push(n.id);
-        });
-
-        // Afficher les offices avec plusieurs IDs
-        officeMap.forEach((ids, office) => {
-          if (ids.length > 1) {
-            console.log('Office avec plusieurs entrées:', {
-              office,
-              ids,
-              notaires: ids.map(id => {
-                const n = response.notaires.find(n => n.id === id);
-                return {
-                  id: n?.id,
-                  office: n?.officeNotarial,
-                  adresse: n?.adresse,
-                  ville: n?.ville,
-                  coords: n?.latitude && n?.longitude ? `${n.latitude},${n.longitude}` : 'pas de coordonnées'
-                };
-              })
-            });
-          }
-        });
-
-        console.log(`${response.notaires.length} notaires chargés depuis Google Sheets`);
-        setNotaires(response.notaires);
-        setError(null);
-      } catch (error) {
-        console.error('Erreur lors du chargement des données:', error);
-        setError('Erreur lors du chargement des données. Veuillez réessayer.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, []);
-
-  // Synchronisation avec Google Sheets
-  const synchronize = useCallback(async () => {
-    setIsSyncing(true);
+  const synchronize = async () => {
     try {
-      await googleSheetsService.saveToSheet(notaires);
-      addToast('Synchronisation réussie !', 'success');
+      setIsSyncing(true);
+      await notaireService.syncWithGoogleSheets();
+      addToast('Synchronisation réussie', 'success');
     } catch (error) {
-      console.error('Erreur de synchronisation:', error);
-      addToast(
-        error instanceof Error 
-          ? `Erreur de synchronisation : ${error.message}`
-          : 'Erreur de synchronisation inconnue',
-        'error'
-      );
+      console.error('Erreur lors de la synchronisation:', error);
+      addToast('Erreur lors de la synchronisation', 'error');
     } finally {
       setIsSyncing(false);
     }
-  }, [notaires]);
+  };
 
-  // Supprimer la synchronisation automatique au chargement
-  // car nous chargeons déjà depuis Google Sheets
-  useEffect(() => {
-    if (notaires.length > 0) {
-      // Ne rien faire ici
+  const handleNotaireClick = (notaire: Notaire) => {
+    setSelectedNotaire(notaire);
+  };
+
+  const handleStatutChange = async (notaire: Notaire, newStatut: NotaireStatut) => {
+    try {
+      const updatedNotaire = { ...notaire, statut: newStatut };
+      await notaireService.updateNotaire(updatedNotaire);
+      addToast('Statut mis à jour avec succès', 'success');
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du statut:', error);
+      addToast('Erreur lors de la mise à jour du statut', 'error');
     }
-  }, [notaires.length, synchronize]);
+  };
 
-  // Test configuration at startup
-  useEffect(() => {
-    const checkConfig = async () => {
-      try {
-        console.log('Testing API configuration...');
-        const config = await googleSheetsService.testConfig();
-        console.log('API configuration:', config);
-      } catch (error) {
-        console.error('API configuration error:', error);
-      }
-    };
-    checkConfig();
-  }, []);
-
-  const handleStatutChange = (notaire: Notaire, newStatut: NotaireStatut) => {
-    const updatedNotaire = { ...notaire, statut: newStatut, dateModification: new Date().toISOString() };
-    setNotaires(notaires.map(n => n.id === notaire.id ? updatedNotaire : n));
+  const handleNotaireUpdate = async (updatedNotaire: Notaire) => {
+    try {
+      await notaireService.updateNotaire(updatedNotaire);
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du notaire:', error);
+      addToast('Erreur lors de la mise à jour du notaire', 'error');
+    }
   };
 
   const notairesFiltres = useMemo(() => {
@@ -268,18 +206,8 @@ const App: React.FC = () => {
     return filtered;
   }, [notaires, filtres]);
 
-  const handleNotaireClick = (notaire: Notaire) => {
-    setSelectedNotaire(notaire);
-  };
-
   const handleCloseModal = () => {
     setSelectedNotaire(null);
-  };
-
-  const handleNotaireUpdate = (updatedNotaire: Notaire) => {
-    const newNotaires = notaires.map(n => n.id === updatedNotaire.id ? updatedNotaire : n);
-    setNotaires(newNotaires);
-    // La synchronisation sera faite automatiquement par le composant qui a fait la mise à jour
   };
 
   const handleFiltresChange = (newFiltres: Filtres) => {

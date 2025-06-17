@@ -12,6 +12,15 @@ const SHEET_RANGES = {
   VILLES_INTERET: 'VillesInteret!A2:G'
 } as const;
 
+// Validation des données
+function isValidNotaireData(data: any[]): boolean {
+  return Array.isArray(data) && data.length >= 20;
+}
+
+function isValidVilleInteretData(data: any[]): boolean {
+  return Array.isArray(data) && data.length >= 7;
+}
+
 async function fetchWithCors(url: string, options?: RequestInit): Promise<Response> {
   try {
     const response = await fetch(url, {
@@ -59,21 +68,52 @@ export const googleSheetsService = {
       // Charger les notaires
       const responseNotaires = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.NOTAIRES}`);
       const dataNotaires = await parseJsonResponse(responseNotaires);
+      
       if (!Array.isArray(dataNotaires)) {
-        throw new Error('Invalid API response format for notaires');
+        throw new Error('Invalid API response format for notaires: not an array');
       }
-      const notaires = dataNotaires.map(row => parseNotaire(row));
+
+      const notaires = dataNotaires.map((row, index) => {
+        if (!isValidNotaireData(row)) {
+          console.warn(`Invalid notaire data at index ${index}:`, row);
+          return null;
+        }
+        try {
+          return parseNotaire(row);
+        } catch (error) {
+          console.error(`Error parsing notaire at index ${index}:`, error);
+          return null;
+        }
+      }).filter((n): n is Notaire => n !== null);
 
       // Charger les villes d'intérêt
       const responseVilles = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.VILLES_INTERET}`);
       const dataVilles = await parseJsonResponse(responseVilles);
+      
       if (!Array.isArray(dataVilles)) {
-        throw new Error('Invalid API response format for villes d\'intérêt');
+        throw new Error('Invalid API response format for villes d\'intérêt: not an array');
       }
-      const villesInteret = dataVilles.map(row => parseVilleInteret(row));
+
+      const villesInteret = dataVilles.map((row, index) => {
+        if (!isValidVilleInteretData(row)) {
+          console.warn(`Invalid ville d'intérêt data at index ${index}:`, row);
+          return null;
+        }
+        try {
+          return parseVilleInteret(row);
+        } catch (error) {
+          console.error(`Error parsing ville d'intérêt at index ${index}:`, error);
+          return null;
+        }
+      }).filter((v): v is VilleInteret => v !== null);
+
+      if (notaires.length === 0) {
+        throw new Error('No valid notaires data found');
+      }
 
       return { notaires, villesInteret };
     } catch (error) {
+      console.error('Error in loadFromSheet:', error);
       throw error;
     }
   },
@@ -82,8 +122,21 @@ export const googleSheetsService = {
     try {
       const notaires = Array.isArray(notaire) ? notaire : [notaire];
 
+      // Valider les données avant l'envoi
+      const validNotaires = notaires.filter(n => {
+        if (!n.id || !n.officeNotarial) {
+          console.warn('Invalid notaire data:', n);
+          return false;
+        }
+        return true;
+      });
+
+      if (validNotaires.length === 0) {
+        throw new Error('No valid notaires to save');
+      }
+
       // Convertir les notaires en tableau de valeurs pour Google Sheets
-      const values = notaires.map(notaire => [
+      const values = validNotaires.map(notaire => [
         notaire.id,
         notaire.officeNotarial,
         notaire.adresse,
@@ -98,12 +151,12 @@ export const googleSheetsService = {
         notaire.serviceNego ? 'oui' : 'non',
         notaire.statut,
         notaire.notes,
-        JSON.stringify(notaire.contacts),
+        JSON.stringify(notaire.contacts || []),
         notaire.dateModification,
         notaire.latitude,
         notaire.longitude,
         notaire.geoScore,
-        JSON.stringify(notaire.geocodingHistory)
+        JSON.stringify(notaire.geocodingHistory || [])
       ]);
 
       const response = await fetchWithCors(`${API_BASE_URL}/sheets`, {
@@ -115,7 +168,12 @@ export const googleSheetsService = {
       });
 
       const data = await parseJsonResponse(response);
+      
+      if (!data.success) {
+        throw new Error('Failed to save to Google Sheets: ' + (data.error || 'Unknown error'));
+      }
     } catch (error) {
+      console.error('Error in saveToSheet:', error);
       throw error;
     }
   },

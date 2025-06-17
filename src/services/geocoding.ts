@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { Notaire, GeocodingResult, GeocodingHistory } from '../types';
 
-export const GEOCODING_CACHE_KEY = 'geocoding_cache';
+const GEOCODING_CACHE_KEY = 'geocoding_cache';
 
 interface GeocodingCache {
   [key: string]: {
@@ -17,6 +17,7 @@ export class GeocodingService {
   private readonly RETRY_DELAY = 2000; // 2 secondes
   private readonly REQUEST_TIMEOUT = 30000; // 30 secondes
   public readonly REQUEST_DELAY = 1000; // 1 seconde entre les requêtes
+  private lastRequestTime: number = 0;
 
   constructor() {
     this.loadCache();
@@ -47,6 +48,8 @@ export class GeocodingService {
       localStorage.setItem(GEOCODING_CACHE_KEY, JSON.stringify(this.cache));
     } catch (error) {
       console.error('Erreur lors de la sauvegarde du cache de géocodage:', error);
+      // En cas d'erreur de stockage (ex: quota dépassé), nettoyer le cache
+      this.clearCache();
     }
   }
 
@@ -58,8 +61,20 @@ export class GeocodingService {
     return Date.now() - timestamp <= this.CACHE_DURATION;
   }
 
+  private async waitForRateLimit(): Promise<void> {
+    const now = Date.now();
+    const timeSinceLastRequest = now - this.lastRequestTime;
+    
+    if (timeSinceLastRequest < this.REQUEST_DELAY) {
+      await new Promise(resolve => setTimeout(resolve, this.REQUEST_DELAY - timeSinceLastRequest));
+    }
+    
+    this.lastRequestTime = Date.now();
+  }
+
   private async retryWithDelay<T>(fn: () => Promise<T>, retries: number = this.MAX_RETRIES): Promise<T> {
     try {
+      await this.waitForRateLimit();
       return await fn();
     } catch (error) {
       if (retries > 0) {
@@ -79,6 +94,16 @@ export class GeocodingService {
   }
 
   async geocodeAddress(address: string): Promise<GeocodingResult> {
+    if (!address || address.trim().length === 0) {
+      return {
+        lat: 0,
+        lon: 0,
+        display_name: '',
+        error: 'Adresse vide',
+        score: 0
+      };
+    }
+
     const cacheKey = this.getCacheKey(address);
     const cached = this.cache[cacheKey];
 
@@ -99,6 +124,10 @@ export class GeocodingService {
         )
       );
 
+      if (!response.data || typeof response.data !== 'object') {
+        throw new Error('Invalid response format');
+      }
+
       if (response.data.error) {
         return {
           lat: 0,
@@ -110,11 +139,17 @@ export class GeocodingService {
       }
 
       const result: GeocodingResult = {
-        lat: response.data.lat,
-        lon: response.data.lon,
-        display_name: response.data.display_name,
-        score: response.data.score
+        lat: Number(response.data.lat) || 0,
+        lon: Number(response.data.lon) || 0,
+        display_name: String(response.data.display_name || ''),
+        score: Number(response.data.score) || 0
       };
+
+      // Valider les coordonnées
+      if (isNaN(result.lat) || isNaN(result.lon) || 
+          Math.abs(result.lat) > 90 || Math.abs(result.lon) > 180) {
+        throw new Error('Invalid coordinates');
+      }
 
       // Mettre en cache
       this.cache[cacheKey] = {
@@ -125,6 +160,7 @@ export class GeocodingService {
 
       return result;
     } catch (error) {
+      console.error('Erreur lors du géocodage:', error);
       return {
         lat: 0,
         lon: 0,
@@ -136,21 +172,21 @@ export class GeocodingService {
   }
 
   async geocodeNotaire(notaire: Notaire): Promise<GeocodingResult> {
-    // Construire l'adresse à géocoder
-    let addressToGeocode = '';
-    
-    // Si nous avons une adresse complète, l'utiliser
-    if (notaire.adresse && notaire.adresse.trim().length > 0) {
-      addressToGeocode = `${notaire.adresse}, ${notaire.codePostal} ${notaire.ville}`;
-    } else {
-      // Sinon, utiliser le code postal et la ville
-      addressToGeocode = `${notaire.codePostal} ${notaire.ville}`;
+    if (!notaire.adresse && !notaire.codePostal && !notaire.ville) {
+      return {
+        lat: 0,
+        lon: 0,
+        display_name: '',
+        error: 'Aucune information d\'adresse disponible',
+        score: 0
+      };
     }
 
-    // Nettoyer l'adresse
-    addressToGeocode = addressToGeocode.trim().replace(/\s+/g, ' ');
-    
-    return this.geocodeAddress(addressToGeocode);
+    const address = notaire.adresse 
+      ? `${notaire.adresse}, ${notaire.codePostal} ${notaire.ville}`
+      : `${notaire.codePostal} ${notaire.ville}`;
+
+    return this.geocodeAddress(address);
   }
 
   async geocodeSingleNotaire(notaire: Notaire): Promise<Notaire> {
@@ -162,7 +198,7 @@ export class GeocodingService {
       ? `${notaire.adresse}, ${notaire.codePostal} ${notaire.ville}`
       : `${notaire.codePostal} ${notaire.ville}`;
 
-    const history: GeocodingHistory = {
+    const history = {
       date: now,
       address: fullAddress,
       success: !result.error,

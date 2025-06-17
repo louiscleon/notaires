@@ -3,6 +3,7 @@ import { Notaire, Contact, ContactStatut } from '../types';
 import { Listbox, Transition } from '@headlessui/react';
 import { ChevronUpDownIcon } from '@heroicons/react/24/solid';
 import { googleSheetsService } from '../services/googleSheets';
+import { notaireService } from '../services/notaireService';
 
 interface Props {
   notaire: Notaire;
@@ -100,20 +101,13 @@ const ContactHistory: React.FC<Props> = ({ notaire, onUpdate }) => {
       // Mettre à jour l'état local immédiatement
       setLocalContacts(updatedNotaire.contacts || []);
       
+      // Mettre à jour via le service
+      await notaireService.updateNotaire(updatedNotaire);
+      
       // Mettre à jour l'état parent
       onUpdate(updatedNotaire);
-
-      // Synchroniser avec Google Sheets
-      console.log('Tentative de synchronisation avec Google Sheets...', {
-        notaireId: updatedNotaire.id,
-        officeNotarial: updatedNotaire.officeNotarial,
-        contacts: updatedNotaire.contacts
-      });
-
-      await googleSheetsService.saveToSheet(updatedNotaire);
-      console.log('Synchronisation avec Google Sheets réussie');
     } catch (error) {
-      console.error('Erreur lors de la synchronisation avec Google Sheets:', error);
+      console.error('Erreur lors de la synchronisation:', error);
     }
   };
 
