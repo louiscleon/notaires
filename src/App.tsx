@@ -51,15 +51,20 @@ const App: React.FC = () => {
         await notaireService.loadInitialData();
         
         // S'abonner aux changements
-        const unsubscribe = notaireService.subscribe((updatedNotaires) => {
+        const unsubscribe = notaireService.subscribe((updatedNotaires, updatedVillesInteret) => {
           setNotaires(updatedNotaires);
+          setFiltres(prevFiltres => ({
+            ...prevFiltres,
+            villesInteret: updatedVillesInteret
+          }));
         });
 
-        // Charger les filtres
+        // Charger les filtres (sauf les villes d'intérêt qui viennent du service)
         const savedData = storageService.loadData();
         setFiltres(prevFiltres => ({
           ...prevFiltres,
-          ...savedData.filtres
+          ...savedData.filtres,
+          villesInteret: notaireService.getVillesInteret() // Utiliser les villes d'intérêt du service
         }));
 
         setLoading(false);

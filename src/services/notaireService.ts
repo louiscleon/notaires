@@ -1,4 +1,4 @@
-import { Notaire, NotaireStatut } from '../types';
+import { Notaire, NotaireStatut, VilleInteret } from '../types';
 import { googleSheetsService } from './googleSheets';
 
 // Validation des données
@@ -16,10 +16,26 @@ function isValidNotaire(notaire: any): notaire is Notaire {
   );
 }
 
+function isValidVilleInteret(ville: any): ville is VilleInteret {
+  return (
+    typeof ville === 'object' &&
+    ville !== null &&
+    typeof ville.id === 'string' &&
+    typeof ville.nom === 'string' &&
+    typeof ville.rayon === 'number' &&
+    typeof ville.latitude === 'number' &&
+    typeof ville.longitude === 'number' &&
+    typeof ville.departement === 'string'
+  );
+}
+
 class NotaireService {
   private notaires: Notaire[] = [];
-  private subscribers: ((notaires: Notaire[]) => void)[] = [];
+  private villesInteret: VilleInteret[] = [];
+  private subscribers: ((notaires: Notaire[], villesInteret: VilleInteret[]) => void)[] = [];
   private isInitialized: boolean = false;
+  private syncTimeout: NodeJS.Timeout | null = null;
+  private readonly SYNC_DELAY = 2000; // 2 secondes de délai avant synchronisation
 
   // Singleton instance
   private static instance: NotaireService;
@@ -35,9 +51,9 @@ class NotaireService {
   }
 
   // Subscribe to changes
-  subscribe(callback: (notaires: Notaire[]) => void) {
+  subscribe(callback: (notaires: Notaire[], villesInteret: VilleInteret[]) => void) {
     this.subscribers.push(callback);
-    callback(this.notaires); // Initial call with current data
+    callback(this.notaires, this.villesInteret); // Initial call with current data
     return () => {
       this.subscribers = this.subscribers.filter(cb => cb !== callback);
     };
@@ -45,7 +61,19 @@ class NotaireService {
 
   // Notify all subscribers
   private notifySubscribers() {
-    this.subscribers.forEach(callback => callback(this.notaires));
+    this.subscribers.forEach(callback => callback(this.notaires, this.villesInteret));
+  }
+
+  // Schedule sync with delay
+  private scheduleSyncWithGoogleSheets() {
+    if (this.syncTimeout) {
+      clearTimeout(this.syncTimeout);
+    }
+    this.syncTimeout = setTimeout(() => {
+      this.syncWithGoogleSheets().catch(error => {
+        console.error('Error during scheduled sync:', error);
+      });
+    }, this.SYNC_DELAY);
   }
 
   // Load initial data
@@ -58,10 +86,19 @@ class NotaireService {
     try {
       const data = await googleSheetsService.loadFromSheet();
       
-      // Valider les données
+      // Valider les notaires
       const validNotaires = data.notaires.filter(notaire => {
         if (!isValidNotaire(notaire)) {
           console.warn('Invalid notaire data:', notaire);
+          return false;
+        }
+        return true;
+      });
+
+      // Valider les villes d'intérêt
+      const validVillesInteret = data.villesInteret.filter(ville => {
+        if (!isValidVilleInteret(ville)) {
+          console.warn('Invalid ville d\'intérêt data:', ville);
           return false;
         }
         return true;
@@ -72,6 +109,7 @@ class NotaireService {
       }
 
       this.notaires = validNotaires;
+      this.villesInteret = validVillesInteret;
       this.isInitialized = true;
       this.notifySubscribers();
     } catch (error) {
@@ -87,6 +125,14 @@ class NotaireService {
       console.warn('NotaireService is not initialized');
     }
     return this.notaires;
+  }
+
+  // Get all villes d'intérêt
+  getVillesInteret(): VilleInteret[] {
+    if (!this.isInitialized) {
+      console.warn('NotaireService is not initialized');
+    }
+    return this.villesInteret;
   }
 
   // Get a single notaire by ID
@@ -121,8 +167,8 @@ class NotaireService {
       this.notaires[index] = updatedNotaire;
       this.notifySubscribers();
 
-      // Sync with Google Sheets
-      await googleSheetsService.saveToSheet(updatedNotaire);
+      // Schedule sync with Google Sheets
+      this.scheduleSyncWithGoogleSheets();
     } catch (error) {
       // Restaurer l'état précédent en cas d'erreur
       const originalNotaire = this.notaires.find(n => n.id === updatedNotaire.id);
@@ -137,72 +183,31 @@ class NotaireService {
     }
   }
 
-  // Add a new notaire
-  async addNotaire(newNotaire: Notaire): Promise<void> {
+  // Update villes d'intérêt
+  async updateVillesInteret(villesInteret: VilleInteret[]): Promise<void> {
     if (!this.isInitialized) {
       throw new Error('NotaireService is not initialized');
     }
 
-    if (!isValidNotaire(newNotaire)) {
-      throw new Error('Invalid notaire data');
+    // Valider les données
+    const validVillesInteret = villesInteret.filter(isValidVilleInteret);
+    if (validVillesInteret.length === 0 && villesInteret.length > 0) {
+      throw new Error('No valid villes d\'intérêt in the data');
     }
+
+    const previousVillesInteret = [...this.villesInteret];
 
     try {
-      // Ensure the notaire has an ID
-      if (!newNotaire.id) {
-        newNotaire.id = `notaire_${Date.now()}`;
-      }
-
-      // Vérifier que l'ID n'existe pas déjà
-      if (this.notaires.some(n => n.id === newNotaire.id)) {
-        throw new Error(`A notaire with ID ${newNotaire.id} already exists`);
-      }
-
-      // Set the modification date
-      newNotaire.dateModification = new Date().toISOString();
-
-      // Update local state
-      this.notaires.push(newNotaire);
+      // Mettre à jour l'état local
+      this.villesInteret = validVillesInteret;
       this.notifySubscribers();
 
-      // Sync with Google Sheets
-      await googleSheetsService.saveToSheet(newNotaire);
+      // Synchroniser avec Google Sheets
+      await googleSheetsService.saveVillesInteret(validVillesInteret);
     } catch (error) {
       // Restaurer l'état précédent en cas d'erreur
-      this.notaires = this.notaires.filter(n => n.id !== newNotaire.id);
+      this.villesInteret = previousVillesInteret;
       this.notifySubscribers();
-
-      console.error('Error adding notaire:', error);
-      throw error;
-    }
-  }
-
-  // Delete a notaire
-  async deleteNotaire(id: string): Promise<void> {
-    if (!this.isInitialized) {
-      throw new Error('NotaireService is not initialized');
-    }
-
-    const index = this.notaires.findIndex(n => n.id === id);
-    if (index === -1) {
-      throw new Error(`Notaire with ID ${id} not found`);
-    }
-
-    const deletedNotaire = this.notaires[index];
-
-    try {
-      // Update local state
-      this.notaires.splice(index, 1);
-      this.notifySubscribers();
-
-      // Sync with Google Sheets
-      await googleSheetsService.saveToSheet(this.notaires);
-    } catch (error) {
-      // Restaurer l'état précédent en cas d'erreur
-      this.notaires.splice(index, 0, deletedNotaire);
-      this.notifySubscribers();
-
-      console.error('Error deleting notaire:', error);
       throw error;
     }
   }
@@ -237,8 +242,13 @@ class NotaireService {
   // Reset service (useful for testing)
   reset(): void {
     this.notaires = [];
+    this.villesInteret = [];
     this.subscribers = [];
     this.isInitialized = false;
+    if (this.syncTimeout) {
+      clearTimeout(this.syncTimeout);
+      this.syncTimeout = null;
+    }
   }
 }
 
