@@ -193,13 +193,12 @@ export const googleSheetsService = {
 
   async saveToSheet(notaire: Notaire | Notaire[]): Promise<void> {
     try {
-      console.log('📥 Début saveToSheet avec:', { notaire });
       const notaires = Array.isArray(notaire) ? notaire : [notaire];
 
       // Valider les données avant l'envoi
       const validNotaires = notaires.filter(n => {
         if (!n.id || !n.officeNotarial) {
-          console.warn('❌ Données invalides:', n);
+          console.warn('Invalid notaire data:', n);
           return false;
         }
         return true;
@@ -210,7 +209,6 @@ export const googleSheetsService = {
       }
 
       // Convertir les notaires en tableau de valeurs pour Google Sheets
-      console.log('🔄 Conversion des données pour Google Sheets...');
       const values = validNotaires.map(notaire => [
         notaire.id,
         notaire.officeNotarial,
@@ -218,59 +216,68 @@ export const googleSheetsService = {
         notaire.codePostal,
         notaire.ville,
         notaire.departement,
-        notaire.email || '',
-        notaire.notairesAssocies || '',
-        notaire.notairesSalaries || '',
-        notaire.nbAssocies || 0,
-        notaire.nbSalaries || 0,
-        notaire.serviceNego === true ? 'oui' : 'non',
-        notaire.statut || 'non_defini',
-        notaire.notes || '',
+        notaire.email,
+        notaire.notairesAssocies,
+        notaire.notairesSalaries,
+        notaire.nbAssocies,
+        notaire.nbSalaries,
+        notaire.serviceNego ? 'oui' : 'non',
+        notaire.statut,
+        notaire.notes,
         JSON.stringify(notaire.contacts || []),
-        notaire.dateModification || new Date().toISOString(),
-        notaire.latitude || 0,
-        notaire.longitude || 0,
-        notaire.geoScore || 0,
+        notaire.dateModification,
+        notaire.latitude,
+        notaire.longitude,
+        notaire.geoScore,
         JSON.stringify(notaire.geocodingHistory || [])
       ]);
 
-      console.log('📤 Envoi à l\'API...', {
-        range: SHEET_RANGES.NOTAIRES,
-        nombreNotaires: values.length,
-        exemple: values[0]
-      });
+      console.log('Envoi des données à Google Sheets...');
+      console.log('Nombre de notaires à sauvegarder:', values.length);
 
+      // Ajouter un timestamp pour forcer le rafraîchissement
+      const timestamp = new Date().getTime();
+      
+      // Utiliser withRetry avec un délai plus long pour les quotas
       const response = await withRetry(
         () => fetchWithCors(`${API_BASE_URL}/sheets`, {
           method: 'POST',
           body: JSON.stringify({ 
             range: SHEET_RANGES.NOTAIRES,
             values,
-            forceSync: true
+            forceSync: true,
+            timestamp
           }),
         }),
-        5,
-        2000
+        5, // 5 tentatives
+        2000 // 2 secondes entre chaque tentative
       );
 
-      console.log('📥 Réponse reçue de l\'API');
       const data = await parseJsonResponse(response);
       
       if (data.error) {
-        console.error('❌ Erreur de réponse API:', data);
+        console.error('Erreur de réponse API:', data);
         throw new Error(`API error: ${data.message || 'Failed to save to Google Sheets'}`);
       }
 
       if (!data.data || !data.data.updatedRange) {
-        console.warn('⚠️ Format de réponse inattendu:', data);
+        console.warn('Warning: Unexpected API response format:', data);
       } else {
-        console.log('✅ Données sauvegardées avec succès');
-        console.log('📍 Plage mise à jour:', data.data.updatedRange);
+        console.log('Données sauvegardées avec succès dans Google Sheets');
+        console.log('Plage mise à jour:', data.data.updatedRange);
       }
 
     } catch (err: unknown) {
       const error = createError(err);
-      console.error('❌ Erreur dans saveToSheet:', error.message);
+      console.error('Error in saveToSheet:', error.message);
+      
+      // Si l'erreur est liée au quota, on attend plus longtemps avant de réessayer
+      if (error.message.includes('Quota exceeded')) {
+        console.log('Quota dépassé, attente de 5 secondes avant de réessayer...');
+        await wait(5000);
+        throw new RetryableError('Quota exceeded, retrying...');
+      }
+      
       throw error;
     }
   },

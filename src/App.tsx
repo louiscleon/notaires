@@ -84,9 +84,37 @@ const App: React.FC = () => {
     storageService.saveFiltres(filtres);
   }, [filtres]);
 
+  const synchronize = async () => {
+    try {
+      setIsSyncing(true);
+      await notaireService.syncWithGoogleSheets();
+      addToast('Synchronisation réussie', 'success');
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation:', error);
+      addToast('Erreur lors de la synchronisation', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleNotaireClick = (notaire: Notaire) => {
+    setSelectedNotaire(notaire);
+  };
+
+  const handleStatutChange = async (notaire: Notaire, newStatut: NotaireStatut) => {
+    try {
+      const updatedNotaire = { ...notaire, statut: newStatut };
+      await notaireService.updateNotaire(updatedNotaire);
+      addToast('Statut mis à jour avec succès', 'success');
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du statut:', error);
+      addToast('Erreur lors de la mise à jour du statut', 'error');
+    }
+  };
+
   const handleNotaireUpdate = async (updatedNotaire: Notaire) => {
     try {
-      // Mettre à jour l'état local immédiatement
+      // Mettre à jour l'état local immédiatement pour une meilleure réactivité
       setNotaires(prevNotaires => {
         const index = prevNotaires.findIndex(n => n.id === updatedNotaire.id);
         if (index === -1) return prevNotaires;
@@ -100,7 +128,20 @@ const App: React.FC = () => {
       await notaireService.updateNotaire(updatedNotaire);
     } catch (error) {
       console.error('Erreur lors de la mise à jour du notaire:', error);
-      addToast('Erreur lors de la mise à jour', 'error');
+      addToast('Erreur lors de la mise à jour du notaire', 'error');
+      
+      // En cas d'erreur, restaurer l'état précédent
+      setNotaires(prevNotaires => {
+        const originalNotaire = prevNotaires.find(n => n.id === updatedNotaire.id);
+        if (!originalNotaire) return prevNotaires;
+        
+        const index = prevNotaires.findIndex(n => n.id === updatedNotaire.id);
+        if (index === -1) return prevNotaires;
+        
+        const newNotaires = [...prevNotaires];
+        newNotaires[index] = originalNotaire;
+        return newNotaires;
+      });
     }
   };
 
@@ -224,19 +265,21 @@ const App: React.FC = () => {
     };
   }, [selectedNotaire]);
 
-  const handleNotaireClick = (notaire: Notaire) => {
-    setSelectedNotaire(notaire);
-  };
+  // Synchroniser périodiquement
+  useEffect(() => {
+    const syncInterval = setInterval(async () => {
+      try {
+        await notaireService.syncWithGoogleSheets();
+        console.log('Synchronisation automatique effectuée');
+      } catch (error) {
+        console.error('Erreur lors de la synchronisation automatique:', error);
+      }
+    }, 60000); // Synchroniser toutes les 60 secondes au lieu de 15
 
-  const handleStatutChange = async (notaire: Notaire, newStatut: NotaireStatut) => {
-    try {
-      const updatedNotaire = { ...notaire, statut: newStatut };
-      await notaireService.updateNotaire(updatedNotaire);
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour du statut:', error);
-      addToast('Erreur lors de la mise à jour du statut', 'error');
-    }
-  };
+    return () => {
+      clearInterval(syncInterval);
+    };
+  }, []); // Ne dépend plus de selectedNotaire
 
   if (loading) {
     return (
@@ -326,7 +369,7 @@ const App: React.FC = () => {
           notairesCount={notairesFiltres.length}
           totalNotaires={notaires.length}
           isSyncing={isSyncing}
-          onSyncClick={() => {}}
+          onSyncClick={synchronize}
           onMenuToggle={() => setIsMenuOpen(!isMenuOpen)}
           isMenuOpen={isMenuOpen}
         />
@@ -393,7 +436,6 @@ const App: React.FC = () => {
               onSave={handleNotaireUpdate}
               isEditing={isEditing}
               setIsEditing={setIsEditing}
-              addToast={addToast}
             />
           </div>
         </div>
