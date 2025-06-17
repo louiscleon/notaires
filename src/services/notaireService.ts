@@ -154,19 +154,29 @@ class NotaireService {
     }
 
     try {
-      console.log(`🔄 Début de la mise à jour pour le notaire ${updatedNotaire.id}...`);
-      
-      // Update the modification date
-      updatedNotaire.dateModification = new Date().toISOString();
+      // Formater les données avant la mise à jour
+      const formattedNotaire = {
+        ...updatedNotaire,
+        nbAssocies: Number(updatedNotaire.nbAssocies) || 0,
+        nbSalaries: Number(updatedNotaire.nbSalaries) || 0,
+        serviceNego: Boolean(updatedNotaire.serviceNego),
+        dateModification: new Date().toISOString(),
+        contacts: updatedNotaire.contacts || [],
+        notes: updatedNotaire.notes || '',
+        email: updatedNotaire.email || '',
+        notairesAssocies: updatedNotaire.notairesAssocies || '',
+        notairesSalaries: updatedNotaire.notairesSalaries || '',
+        statut: updatedNotaire.statut || 'non_defini'
+      };
 
       // Update local state immediately
       const index = this.notaires.findIndex(n => n.id === updatedNotaire.id);
-      this.notaires[index] = updatedNotaire;
+      this.notaires[index] = formattedNotaire;
       this.notifySubscribers();
       console.log(`✅ État local mis à jour pour ${updatedNotaire.id}`);
 
       // Synchroniser immédiatement avec Google Sheets
-      await this.forceSyncNotaire(updatedNotaire);
+      await googleSheetsService.saveToSheet(formattedNotaire);
       
       console.log(`✨ Mise à jour complète réussie pour ${updatedNotaire.id}`);
     } catch (error) {

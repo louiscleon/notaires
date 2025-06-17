@@ -216,41 +216,38 @@ export const googleSheetsService = {
         notaire.codePostal,
         notaire.ville,
         notaire.departement,
-        notaire.email,
-        notaire.notairesAssocies,
-        notaire.notairesSalaries,
-        notaire.nbAssocies,
-        notaire.nbSalaries,
-        notaire.serviceNego ? 'oui' : 'non',
-        notaire.statut,
-        notaire.notes,
+        notaire.email || '',
+        notaire.notairesAssocies || '',
+        notaire.notairesSalaries || '',
+        notaire.nbAssocies || 0,
+        notaire.nbSalaries || 0,
+        notaire.serviceNego === true ? 'oui' : 'non',
+        notaire.statut || 'non_defini',
+        notaire.notes || '',
         JSON.stringify(notaire.contacts || []),
-        notaire.dateModification,
-        notaire.latitude,
-        notaire.longitude,
-        notaire.geoScore,
+        notaire.dateModification || new Date().toISOString(),
+        notaire.latitude || 0,
+        notaire.longitude || 0,
+        notaire.geoScore || 0,
         JSON.stringify(notaire.geocodingHistory || [])
       ]);
 
-      console.log('Envoi des données à Google Sheets...');
-      console.log('Nombre de notaires à sauvegarder:', values.length);
+      console.log('Envoi des données à Google Sheets...', {
+        nombreNotaires: values.length,
+        exemple: values[0]
+      });
 
-      // Ajouter un timestamp pour forcer le rafraîchissement
-      const timestamp = new Date().getTime();
-      
-      // Utiliser withRetry avec un délai plus long pour les quotas
       const response = await withRetry(
         () => fetchWithCors(`${API_BASE_URL}/sheets`, {
           method: 'POST',
           body: JSON.stringify({ 
             range: SHEET_RANGES.NOTAIRES,
             values,
-            forceSync: true,
-            timestamp
+            forceSync: true
           }),
         }),
-        5, // 5 tentatives
-        2000 // 2 secondes entre chaque tentative
+        5,
+        2000
       );
 
       const data = await parseJsonResponse(response);
@@ -270,14 +267,6 @@ export const googleSheetsService = {
     } catch (err: unknown) {
       const error = createError(err);
       console.error('Error in saveToSheet:', error.message);
-      
-      // Si l'erreur est liée au quota, on attend plus longtemps avant de réessayer
-      if (error.message.includes('Quota exceeded')) {
-        console.log('Quota dépassé, attente de 5 secondes avant de réessayer...');
-        await wait(5000);
-        throw new RetryableError('Quota exceeded, retrying...');
-      }
-      
       throw error;
     }
   },
