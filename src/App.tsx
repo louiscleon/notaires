@@ -86,10 +86,7 @@ const App: React.FC = () => {
 
   const handleNotaireUpdate = async (updatedNotaire: Notaire) => {
     try {
-      setIsSyncing(true);
-      console.log('🔄 Début de la mise à jour du notaire...');
-
-      // Mettre à jour l'état local immédiatement pour une meilleure réactivité
+      // Mettre à jour l'état local immédiatement
       setNotaires(prevNotaires => {
         const index = prevNotaires.findIndex(n => n.id === updatedNotaire.id);
         if (index === -1) return prevNotaires;
@@ -101,30 +98,9 @@ const App: React.FC = () => {
 
       // Synchroniser avec le service
       await notaireService.updateNotaire(updatedNotaire);
-      
-      // Forcer une synchronisation complète
-      await notaireService.syncWithGoogleSheets();
-      
-      console.log('✅ Mise à jour et synchronisation réussies');
-      // La notification est maintenant gérée par le composant qui a initié la modification
     } catch (error) {
-      console.error('❌ Erreur lors de la mise à jour du notaire:', error);
-      addToast('Erreur lors de la mise à jour du notaire', 'error');
-      
-      // En cas d'erreur, restaurer l'état précédent
-      setNotaires(prevNotaires => {
-        const originalNotaire = prevNotaires.find(n => n.id === updatedNotaire.id);
-        if (!originalNotaire) return prevNotaires;
-        
-        const index = prevNotaires.findIndex(n => n.id === updatedNotaire.id);
-        if (index === -1) return prevNotaires;
-        
-        const newNotaires = [...prevNotaires];
-        newNotaires[index] = originalNotaire;
-        return newNotaires;
-      });
-    } finally {
-      setIsSyncing(false);
+      console.error('Erreur lors de la mise à jour du notaire:', error);
+      addToast('Erreur lors de la mise à jour', 'error');
     }
   };
 
@@ -248,62 +224,17 @@ const App: React.FC = () => {
     };
   }, [selectedNotaire]);
 
-  // Synchroniser périodiquement
-  useEffect(() => {
-    const syncInterval = setInterval(async () => {
-      try {
-        if (!isSyncing) {
-          await notaireService.syncWithGoogleSheets();
-          console.log('Synchronisation automatique effectuée');
-          // Ne pas afficher de notification pour les synchronisations automatiques
-        }
-      } catch (error) {
-        console.error('Erreur lors de la synchronisation automatique:', error);
-        // Afficher une notification uniquement en cas d'erreur
-        addToast('Erreur lors de la synchronisation automatique', 'error');
-      }
-    }, 60000);
-
-    return () => {
-      clearInterval(syncInterval);
-    };
-  }, [isSyncing]);
-
-  const synchronize = async () => {
-    try {
-      setIsSyncing(true);
-      await notaireService.syncWithGoogleSheets();
-      // Afficher une notification uniquement pour la synchronisation manuelle
-      addToast('Synchronisation réussie', 'success');
-    } catch (error) {
-      console.error('Erreur lors de la synchronisation:', error);
-      addToast('Erreur lors de la synchronisation', 'error');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
   const handleNotaireClick = (notaire: Notaire) => {
     setSelectedNotaire(notaire);
   };
 
   const handleStatutChange = async (notaire: Notaire, newStatut: NotaireStatut) => {
     try {
-      setIsSyncing(true);
       const updatedNotaire = { ...notaire, statut: newStatut };
-      
-      // Mettre à jour via le service
       await notaireService.updateNotaire(updatedNotaire);
-      
-      // Forcer une synchronisation complète
-      await notaireService.syncWithGoogleSheets();
-      
-      addToast('Statut mis à jour avec succès', 'success');
     } catch (error) {
       console.error('Erreur lors de la mise à jour du statut:', error);
       addToast('Erreur lors de la mise à jour du statut', 'error');
-    } finally {
-      setIsSyncing(false);
     }
   };
 
@@ -395,7 +326,7 @@ const App: React.FC = () => {
           notairesCount={notairesFiltres.length}
           totalNotaires={notaires.length}
           isSyncing={isSyncing}
-          onSyncClick={synchronize}
+          onSyncClick={() => {}}
           onMenuToggle={() => setIsMenuOpen(!isMenuOpen)}
           isMenuOpen={isMenuOpen}
         />
@@ -462,6 +393,7 @@ const App: React.FC = () => {
               onSave={handleNotaireUpdate}
               isEditing={isEditing}
               setIsEditing={setIsEditing}
+              addToast={addToast}
             />
           </div>
         </div>

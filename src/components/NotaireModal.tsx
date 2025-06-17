@@ -14,6 +14,7 @@ interface Props {
   onSave: (notaire: Notaire) => void;
   isEditing: boolean;
   setIsEditing: Dispatch<SetStateAction<boolean>>;
+  addToast: (message: string, type: 'success' | 'error') => void;
 }
 
 interface CustomSelectProps {
@@ -90,7 +91,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, l
   );
 };
 
-const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEditing, setIsEditing }) => {
+const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEditing, setIsEditing, addToast }) => {
   // Vérifier que le notaire a un ID valide
   if (!notaire.id) {
     console.error('Notaire sans ID reçu dans NotaireModal');
@@ -128,44 +129,21 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     return () => clearTimeout(timeoutId);
   }, [editedNotaire.adresse]);
 
-  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
-    // S'assurer que l'ID est toujours présent
     if (!editedNotaire.id) {
       console.error('ID du notaire manquant');
       setSaveError('Erreur : ID du notaire manquant');
       return;
     }
 
-    const updatedNotaire = {
-      ...editedNotaire,
+    // Mettre à jour uniquement l'état local
+    setEditedNotaire(prev => ({
+      ...prev,
       [name]: value,
-      id: editedNotaire.id,
       dateModification: new Date().toISOString()
-    };
-
-    try {
-      // Mettre à jour l'état local
-      setEditedNotaire(updatedNotaire);
-      console.log(`🔄 Début de la mise à jour du champ ${name} pour le notaire ${updatedNotaire.id}`);
-
-      // Synchroniser immédiatement avec Google Sheets
-      await notaireService.updateNotaire(updatedNotaire);
-      
-      // Mettre à jour l'état parent
-      onSave(updatedNotaire);
-
-      console.log(`✅ Champ ${name} mis à jour et synchronisé avec succès`);
-      setSaveError(null);
-    } catch (error) {
-      console.error('❌ Erreur lors de la synchronisation:', error);
-      setSaveError('Erreur lors de la sauvegarde. Veuillez réessayer.');
-    }
-
-    if (name === 'adresse') {
-      setShowSuggestions(true);
-    }
+    }));
   };
 
   const handleSelectAdresse = async (suggestion: AdresseSuggestion) => {
@@ -280,34 +258,34 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     }
   };
 
-  // Fonction pour gérer la fermeture du modal avec synchronisation
-  const handleModalClose = async () => {
+  const handleSave = async () => {
     try {
       setSaveError(null);
-      console.log('🔄 Synchronisation finale avant fermeture...');
       
-      // Vérifier s'il y a eu des modifications
-      const hasChanges = JSON.stringify(notaire) !== JSON.stringify(editedNotaire);
+      // Synchroniser avec Google Sheets
+      await notaireService.updateNotaire(editedNotaire);
       
-      if (hasChanges) {
-        // Synchroniser avec Google Sheets avant de fermer
-        await notaireService.updateNotaire(editedNotaire);
-        
-        // Forcer une synchronisation complète
-        await notaireService.syncWithGoogleSheets();
-        
-        // Mettre à jour l'état parent
-        onSave(editedNotaire);
-        
-        console.log('✅ Synchronisation finale réussie');
-      }
+      // Mettre à jour l'état parent
+      onSave(editedNotaire);
       
-      // Fermer le modal
-      onClose();
+      addToast('Modifications enregistrées', 'success');
     } catch (error) {
-      console.error('❌ Erreur lors de la synchronisation finale:', error);
-      setSaveError('Erreur lors de la sauvegarde. Voulez-vous réessayer avant de fermer ?');
+      console.error('Erreur lors de la sauvegarde:', error);
+      setSaveError('Erreur lors de la sauvegarde. Veuillez réessayer.');
     }
+  };
+
+  const handleModalClose = () => {
+    // Si des modifications ont été faites, demander confirmation
+    const hasChanges = JSON.stringify(notaire) !== JSON.stringify(editedNotaire);
+    
+    if (hasChanges) {
+      if (window.confirm('Voulez-vous enregistrer les modifications avant de fermer ?')) {
+        handleSave();
+      }
+    }
+    
+    onClose();
   };
 
   return (
@@ -576,6 +554,23 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                       </div>
                     </div>
                   )}
+                </div>
+
+                <div className="px-4 py-3 bg-gray-50 sm:flex sm:flex-row-reverse sm:px-6">
+                  <button
+                    type="button"
+                    className="inline-flex w-full justify-center rounded-md bg-teal-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-500 sm:ml-3 sm:w-auto"
+                    onClick={handleSave}
+                  >
+                    Enregistrer
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
+                    onClick={handleModalClose}
+                  >
+                    Fermer
+                  </button>
                 </div>
               </Dialog.Panel>
             </Transition.Child>
