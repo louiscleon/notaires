@@ -169,9 +169,16 @@ export const googleSheetsService = {
 
       const data = await parseJsonResponse(response);
       
-      if (!data.success) {
-        throw new Error('Failed to save to Google Sheets: ' + (data.error || 'Unknown error'));
+      // Vérifier si la réponse contient une erreur
+      if (data.error) {
+        throw new Error(data.message || 'Failed to save to Google Sheets');
       }
+
+      // Vérifier si la réponse contient les données attendues
+      if (!data.data || !data.data.updatedRange) {
+        console.warn('Unexpected API response format:', data);
+      }
+
     } catch (error) {
       console.error('Error in saveToSheet:', error);
       throw error;

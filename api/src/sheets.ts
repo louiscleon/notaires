@@ -24,8 +24,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!SPREADSHEET_ID) {
       console.error('SPREADSHEET_ID is missing');
       return res.status(500).json({
-        error: 'Configuration Error',
-        message: 'Spreadsheet ID is not configured'
+        error: true,
+        message: 'Configuration Error: Spreadsheet ID is not configured'
       });
     }
 
@@ -34,8 +34,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const range = req.query.range as string;
         if (!range) {
           return res.status(400).json({
-            error: 'Validation Error',
-            message: 'Range parameter is required'
+            error: true,
+            message: 'Validation Error: Range parameter is required'
           });
         }
 
@@ -58,8 +58,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (!response.data) {
             console.error('No data in response from Google Sheets');
             return res.status(500).json({
-              error: 'Google Sheets API Error',
-              message: 'No data in response'
+              error: true,
+              message: 'Google Sheets API Error: No data in response'
             });
           }
 
@@ -78,8 +78,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             error: safeStringify(error)
           });
           return res.status(500).json({
-            error: 'Google Sheets API Error',
-            message: error.message || 'Failed to fetch data'
+            error: true,
+            message: `Google Sheets API Error: ${error.message || 'Failed to fetch data'}`
           });
         }
       }
@@ -88,8 +88,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { range: writeRange, values } = req.body;
         if (!writeRange || !values) {
           return res.status(400).json({
-            error: 'Validation Error',
-            message: 'Range and values are required'
+            error: true,
+            message: 'Validation Error: Range and values are required'
           });
         }
 
@@ -111,6 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           console.log('Data written successfully:', safeStringify(writeResponse.data));
           return res.status(200).json({
+            error: false,
             data: writeResponse.data
           });
         } catch (e) {
@@ -121,16 +122,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             error: safeStringify(error)
           });
           return res.status(500).json({
-            error: 'Google Sheets API Error',
-            message: error.message || 'Failed to write data'
+            error: true,
+            message: `Google Sheets API Error: ${error.message || 'Failed to write data'}`
           });
         }
       }
 
       default:
         return res.status(405).json({
-          error: 'Method Not Allowed',
-          message: `Method ${req.method} is not supported`
+          error: true,
+          message: `Method Not Allowed: Method ${req.method} is not supported`
         });
     }
   } catch (error) {
@@ -143,8 +144,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Send a detailed error response
     return res.status(500).json({
-      error: 'Internal Server Error',
-      message: error instanceof Error ? error.message : 'An unexpected error occurred'
+      error: true,
+      message: `Internal Server Error: ${error instanceof Error ? error.message : 'An unexpected error occurred'}`
     });
   }
 } 
