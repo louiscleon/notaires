@@ -156,9 +156,6 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       // Mettre à jour l'état parent
       onSave(updatedNotaire);
 
-      // Forcer une synchronisation immédiate avec Google Sheets
-      await notaireService.syncWithGoogleSheets();
-
       console.log(`Champ ${name} mis à jour et synchronisé avec succès pour le notaire ${updatedNotaire.id}`);
       setSaveError(null); // Effacer les erreurs précédentes
     } catch (error) {
@@ -262,9 +259,6 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       // Synchroniser avec Google Sheets
       await notaireService.updateNotaire(updatedNotaire);
       
-      // Forcer une synchronisation immédiate
-      await notaireService.syncWithGoogleSheets();
-      
       // Mettre à jour l'état parent
       onSave(updatedNotaire);
 
@@ -305,8 +299,6 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
         console.log('Modifications détectées, synchronisation avant fermeture...');
         // Synchroniser avec Google Sheets avant de fermer
         await notaireService.updateNotaire(editedNotaire);
-        // Forcer une synchronisation immédiate
-        await notaireService.syncWithGoogleSheets();
         // Mettre à jour l'état parent
         onSave(editedNotaire);
       }

@@ -247,15 +247,14 @@ const App: React.FC = () => {
   // Synchroniser avant de quitter la page
   useEffect(() => {
     const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
-      if (selectedNotaire) {
-        e.preventDefault();
-        e.returnValue = '';
-        
-        try {
-          await notaireService.syncWithGoogleSheets();
-        } catch (error) {
-          console.error('Erreur lors de la synchronisation finale:', error);
-        }
+      e.preventDefault();
+      e.returnValue = '';
+      
+      try {
+        // Forcer la sauvegarde de toutes les modifications en attente
+        await notaireService.syncWithGoogleSheets();
+      } catch (error) {
+        console.error('Erreur lors de la synchronisation finale:', error);
       }
     };
 
@@ -263,9 +262,9 @@ const App: React.FC = () => {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [selectedNotaire]);
+  }, []);
 
-  // Synchroniser périodiquement
+  // Synchroniser périodiquement (moins fréquemment pour éviter les conflits)
   useEffect(() => {
     const syncInterval = setInterval(async () => {
       try {
@@ -274,12 +273,12 @@ const App: React.FC = () => {
       } catch (error) {
         console.error('Erreur lors de la synchronisation automatique:', error);
       }
-    }, 60000); // Synchroniser toutes les 60 secondes au lieu de 15
+    }, 300000); // Synchroniser toutes les 5 minutes au lieu de 1 minute
 
     return () => {
       clearInterval(syncInterval);
     };
-  }, []); // Ne dépend plus de selectedNotaire
+  }, []);
 
   if (loading) {
     return (

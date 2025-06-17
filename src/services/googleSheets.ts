@@ -133,43 +133,17 @@ async function parseJsonResponse(response: Response): Promise<any> {
   }
 }
 
-// Queue de mise à jour
-let updateQueue: Array<{
-  notaire: Notaire | Notaire[];
-  resolve: (value: void | PromiseLike<void>) => void;
-  reject: (reason?: any) => void;
-}> = [];
-let isProcessingQueue = false;
+// Système de queue simplifié
+let pendingSaves: Map<string, Notaire> = new Map();
+let saveTimeout: NodeJS.Timeout | null = null;
+let isSaving = false;
 
-// Fonction pour traiter la queue
-async function processUpdateQueue() {
-  if (isProcessingQueue || updateQueue.length === 0) return;
-  
-  isProcessingQueue = true;
-  console.log(`🔄 Traitement de la queue de mise à jour (${updateQueue.length} éléments)`);
-
-  try {
-    const item = updateQueue[0];
-    await saveToSheetInternal(item.notaire);
-    item.resolve();
-    updateQueue.shift();
-    console.log('✅ Mise à jour réussie, élément retiré de la queue');
-  } catch (error) {
-    console.error('❌ Erreur lors du traitement de la queue:', error);
-    const item = updateQueue[0];
-    item.reject(error);
-    updateQueue.shift();
-  } finally {
-    isProcessingQueue = false;
-    if (updateQueue.length > 0) {
-      setTimeout(processUpdateQueue, 1000); // Attendre 1 seconde avant de traiter le prochain élément
-    }
+// Fonction pour sauvegarder dans Google Sheets
+async function saveToSheetInternal(notaires: Notaire[]): Promise<void> {
+  if (notaires.length === 0) {
+    console.warn('No notaires to save');
+    return;
   }
-}
-
-// Fonction interne pour sauvegarder dans Google Sheets
-async function saveToSheetInternal(notaire: Notaire | Notaire[]): Promise<void> {
-  const notaires = Array.isArray(notaire) ? notaire : [notaire];
 
   // Valider les données avant l'envoi
   const validNotaires = notaires.filter(n => {
@@ -208,9 +182,8 @@ async function saveToSheetInternal(notaire: Notaire | Notaire[]): Promise<void> 
     JSON.stringify(notaire.geocodingHistory || [])
   ]);
 
-  console.log('Envoi des données à Google Sheets...');
-  console.log('Nombre de notaires à sauvegarder:', values.length);
-
+  console.log(`💾 Sauvegarde de ${validNotaires.length} notaire(s) dans Google Sheets...`);
+  
   const timestamp = new Date().getTime();
   
   const response = await withRetry(
@@ -223,8 +196,8 @@ async function saveToSheetInternal(notaire: Notaire | Notaire[]): Promise<void> 
         timestamp
       }),
     }),
-    5,
-    2000
+    3, // Réduire le nombre de tentatives
+    1000
   );
 
   const data = await parseJsonResponse(response);
@@ -234,11 +207,26 @@ async function saveToSheetInternal(notaire: Notaire | Notaire[]): Promise<void> 
     throw new Error(`API error: ${data.message || 'Failed to save to Google Sheets'}`);
   }
 
-  if (!data.data || !data.data.updatedRange) {
-    console.warn('Warning: Unexpected API response format:', data);
-  } else {
-    console.log('Données sauvegardées avec succès dans Google Sheets');
-    console.log('Plage mise à jour:', data.data.updatedRange);
+  console.log(`✅ ${validNotaires.length} notaire(s) sauvegardé(s) avec succès`);
+}
+
+// Fonction pour traiter les sauvegardes en attente
+async function processPendingSaves(): Promise<void> {
+  if (isSaving || pendingSaves.size === 0) {
+    return;
+  }
+
+  try {
+    isSaving = true;
+    const notairesToSave = Array.from(pendingSaves.values());
+    pendingSaves.clear();
+    
+    await saveToSheetInternal(notairesToSave);
+  } catch (error) {
+    console.error('❌ Erreur lors de la sauvegarde:', error);
+    throw error;
+  } finally {
+    isSaving = false;
   }
 }
 
@@ -301,10 +289,36 @@ export const googleSheetsService = {
   },
 
   async saveToSheet(notaire: Notaire | Notaire[]): Promise<void> {
-    return new Promise((resolve, reject) => {
-      updateQueue.push({ notaire, resolve, reject });
-      processUpdateQueue();
+    const notaires = Array.isArray(notaire) ? notaire : [notaire];
+    
+    // Ajouter les notaires à la queue
+    notaires.forEach(n => {
+      if (n.id) {
+        pendingSaves.set(n.id, n);
+      }
     });
+
+    // Annuler le timeout précédent
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+    }
+
+    // Programmer une sauvegarde dans 2 secondes (debounce)
+    saveTimeout = setTimeout(async () => {
+      try {
+        await processPendingSaves();
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde différée:', error);
+      }
+    }, 2000);
+  },
+
+  async forceSave(): Promise<void> {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
+    }
+    await processPendingSaves();
   },
 
   async saveVillesInteret(villesInteret: VilleInteret[]): Promise<void> {
