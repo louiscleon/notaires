@@ -5,13 +5,14 @@ import NotaireModal from './components/NotaireModal';
 import SidebarMenu from './components/SidebarMenu';
 import Navbar from './components/Navbar';
 import NotairesTable from './components/NotairesTable';
+import SearchAndFilters from './components/SearchAndFilters';
+import ActiveFiltersDisplay from './components/ActiveFiltersDisplay';
 import { storageService } from './services/storage';
 import './App.css';
 import Dashboard from './components/Dashboard';
 import Toast from './components/Toast';
 import Logo from './components/Logo';
 import { notaireService } from './services/notaireService';
-import SearchBar from './components/SearchBar';
 
 interface ToastMessage {
   message: string;
@@ -262,6 +263,26 @@ const App: React.FC = () => {
     storageService.saveFiltres(newFiltres);
   };
 
+  const clearAllFilters = () => {
+    const clearedFiltres: Filtres = {
+      typeNotaire: 'tous',
+      serviceNego: 'tous',
+      minAssocies: 0,
+      maxAssocies: 10,
+      minSalaries: 0,
+      maxSalaries: 10,
+      statuts: [],
+      showOnlyWithEmail: false,
+      contactStatuts: [],
+      showNonContactes: false,
+      showOnlyInRadius: false,
+      villesInteret: filtres.villesInteret, // Garder les villes d'intérêt
+    };
+    setFiltres(clearedFiltres);
+    setSearchQuery(''); // Aussi effacer la recherche
+    storageService.saveFiltres(clearedFiltres);
+  };
+
   // Synchroniser périodiquement (moins fréquemment pour éviter les conflits)
   useEffect(() => {
     const syncInterval = setInterval(async () => {
@@ -371,21 +392,24 @@ const App: React.FC = () => {
         />
 
         <div className="p-4 lg:p-8">
-          {/* Barre de recherche globale */}
-          <div className="mb-4 bg-white rounded-lg shadow-lg p-4">
-            <div className="flex items-center space-x-2 mb-2">
-              <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <span className="text-sm font-medium text-gray-700">Recherche globale</span>
-              <span className="text-xs text-gray-500">({notairesFiltres.length} résultat{notairesFiltres.length > 1 ? 's' : ''})</span>
-            </div>
-            <SearchBar
-              value={searchQuery}
-              onChange={setSearchQuery}
-              resultCount={notairesFiltres.length}
-            />
-          </div>
+          {/* Recherche et filtres centralisés */}
+          <SearchAndFilters
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            filtres={filtres}
+            onFiltresChange={handleFiltresChange}
+            resultCount={notairesFiltres.length}
+            totalCount={notaires.length}
+          />
+
+          {/* Affichage des filtres actifs */}
+          <ActiveFiltersDisplay
+            filtres={filtres}
+            searchQuery={searchQuery}
+            resultCount={notairesFiltres.length}
+            totalCount={notaires.length}
+            onClearFilters={clearAllFilters}
+          />
 
           {viewMode === 'carte' ? (
             <div className="space-y-4 lg:space-y-8">

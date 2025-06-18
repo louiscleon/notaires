@@ -55,14 +55,6 @@ const MapCenterController: React.FC<{ villesInteret: VilleInteret[] }> = ({ vill
   return null;
 };
 
-interface Props {
-  notaires: Notaire[];
-  villesInteret: VilleInteret[];
-  onNotaireClick?: (notaire: Notaire) => void;
-  onNotaireUpdate?: (notaire: Notaire) => void;
-  showOnlyInRadius?: boolean;
-}
-
 const ResetViewControl: React.FC = () => {
   const map = useMap();
   const defaultBounds: L.LatLngBoundsExpression = [
@@ -91,8 +83,16 @@ const ResetViewControl: React.FC = () => {
   );
 };
 
+interface Props {
+  notaires: Notaire[]; // Les notaires DÉJÀ FILTRÉS par le composant parent
+  villesInteret: VilleInteret[];
+  onNotaireClick?: (notaire: Notaire) => void;
+  onNotaireUpdate?: (notaire: Notaire) => void;
+  showOnlyInRadius?: boolean;
+}
+
 const MapComponent: React.FC<Props> = ({
-  notaires,
+  notaires, // Déjà filtrés par App.tsx
   villesInteret,
   onNotaireClick,
   onNotaireUpdate,
@@ -187,7 +187,7 @@ const MapComponent: React.FC<Props> = ({
             initialGeocodingDone.current = true;
           })
           .catch(error => {
-            console.error('🗺️ Erreur de géocodage:', error);
+            console.error('Erreur de géocodage:', error);
             geocodingRef.current = false;
             setLoading(false);
           });
@@ -197,10 +197,10 @@ const MapComponent: React.FC<Props> = ({
     }
   }, [notaires, onNotaireUpdate]);
 
-  // Calculer directement les notaires à afficher
+  // SIMPLIFIÉ : Juste filtrer ceux qui ont des coordonnées + rayon si demandé
   const notairesToDisplay = useMemo(() => {
-    // Filtrer les notaires qui ont des coordonnées valides
-    let notairesValides = notaires.filter(n =>
+    // 1. Filtrer ceux qui ont des coordonnées valides
+    let validNotaires = notaires.filter(n =>
       typeof n.latitude === 'number' &&
       typeof n.longitude === 'number' &&
       !isNaN(n.latitude) &&
@@ -209,12 +209,12 @@ const MapComponent: React.FC<Props> = ({
       n.longitude !== 0
     );
 
-    // Appliquer le filtre de rayon si nécessaire
+    // 2. Appliquer le filtre de rayon SI demandé
     if (showOnlyInRadius && villesInteret.length > 0) {
-      notairesValides = notairesValides.filter(notaire => isNotaireInRadius(notaire, villesInteret));
+      validNotaires = validNotaires.filter(notaire => isNotaireInRadius(notaire, villesInteret));
     }
 
-    return notairesValides;
+    return validNotaires;
   }, [notaires, showOnlyInRadius, villesInteret, isNotaireInRadius]);
 
   return (
@@ -272,10 +272,10 @@ const MapComponent: React.FC<Props> = ({
             ) : null
           )}
 
-          {/* Marqueurs des notaires */}
+          {/* Marqueurs des notaires - AFFICHAGE DIRECT */}
           <React.Fragment key={`markers-${notairesToDisplay.length}`}>
             {notairesToDisplay.map((notaire) => {
-              // Vérification des coordonnées
+              // Validation simple des coordonnées
               if (!notaire.latitude || !notaire.longitude || 
                   isNaN(notaire.latitude) || isNaN(notaire.longitude)) {
                 return null;

@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Notaire, NotaireStatut } from '../types';
 
 interface Props {
-  notaires: Notaire[];
+  notaires: Notaire[]; // Les notaires DÉJÀ FILTRÉS par le composant parent
   onNotaireClick: (notaire: Notaire) => void;
   selectedNotaire?: Notaire;
   onStatutChange: (notaire: Notaire, newStatut: NotaireStatut) => void;
@@ -22,7 +22,12 @@ const statusLabels: Record<NotaireStatut, string> = {
   'non_defini': 'Non défini'
 };
 
-const NotairesTable: React.FC<Props> = ({ notaires, onNotaireClick, selectedNotaire, onStatutChange }) => {
+const NotairesTable: React.FC<Props> = ({ 
+  notaires, // Déjà filtrés par App.tsx 
+  onNotaireClick, 
+  selectedNotaire, 
+  onStatutChange 
+}) => {
   const [openStatusMenu, setOpenStatusMenu] = useState<string | null>(null);
 
   const handleStatutClick = (e: React.MouseEvent, notaire: Notaire) => {
@@ -109,11 +114,23 @@ const NotairesTable: React.FC<Props> = ({ notaires, onNotaireClick, selectedNota
     </div>
   );
 
+  // AFFICHAGE DIRECT - pas de filtrage interne
   return (
     <div className="space-y-4">
+      {/* Message si aucun résultat */}
+      {notaires.length === 0 && (
+        <div className="text-center py-8 text-gray-500">
+          <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <p className="text-lg font-medium">Aucun notaire trouvé</p>
+          <p className="text-sm">Essayez de modifier vos filtres ou votre recherche</p>
+        </div>
+      )}
+
       {/* Vue mobile en cartes */}
       <div className="md:hidden space-y-3">
-        {notaires.map((notaire, index) => (
+        {notaires.map((notaire) => (
           <div key={`mobile-${notaire.id}`}>
             {renderMobileCard(notaire)}
           </div>
@@ -121,78 +138,80 @@ const NotairesTable: React.FC<Props> = ({ notaires, onNotaireClick, selectedNota
       </div>
 
       {/* Vue desktop en tableau */}
-      <div className="hidden md:block overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Statut
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Office Notarial
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Adresse
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Équipe
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Service Négo
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {notaires.map((notaire) => (
-              <tr
-                key={notaire.id}
-                onClick={() => onNotaireClick(notaire)}
-                className={`cursor-pointer hover:bg-gray-50 transition-colors duration-150 ${
-                  selectedNotaire?.id === notaire.id ? 'bg-teal-50' : ''
-                }`}
-              >
-                <td className="px-6 py-4 whitespace-nowrap relative">
-                  {renderStatusButton(notaire)}
-                  {renderStatusMenu(notaire)}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm font-medium text-gray-900">
-                    {notaire.officeNotarial}
-                  </div>
-                  {notaire.email && (
-                    <div className="text-sm text-teal-600">
-                      {notaire.email}
-                    </div>
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm text-gray-900">
-                    {notaire.adresse}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {notaire.codePostal} {notaire.ville}
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm text-gray-900">
-                    {notaire.nbAssocies} associé{notaire.nbAssocies > 1 ? 's' : ''}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {notaire.nbSalaries} salarié{notaire.nbSalaries > 1 ? 's' : ''}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {notaire.serviceNego ? (
-                    <span className="text-teal-600">Oui ✓</span>
-                  ) : (
-                    <span>Non</span>
-                  )}
-                </td>
+      {notaires.length > 0 && (
+        <div className="hidden md:block overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Statut
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Office Notarial
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Adresse
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Équipe
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Service Négo
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {notaires.map((notaire) => (
+                <tr
+                  key={notaire.id}
+                  onClick={() => onNotaireClick(notaire)}
+                  className={`cursor-pointer hover:bg-gray-50 transition-colors duration-150 ${
+                    selectedNotaire?.id === notaire.id ? 'bg-teal-50' : ''
+                  }`}
+                >
+                  <td className="px-6 py-4 whitespace-nowrap relative">
+                    {renderStatusButton(notaire)}
+                    {renderStatusMenu(notaire)}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-medium text-gray-900">
+                      {notaire.officeNotarial}
+                    </div>
+                    {notaire.email && (
+                      <div className="text-sm text-teal-600">
+                        {notaire.email}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm text-gray-900">
+                      {notaire.adresse}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {notaire.codePostal} {notaire.ville}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm text-gray-900">
+                      {notaire.nbAssocies} associé{notaire.nbAssocies > 1 ? 's' : ''}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {notaire.nbSalaries} salarié{notaire.nbSalaries > 1 ? 's' : ''}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {notaire.serviceNego ? (
+                      <span className="text-teal-600">Oui ✓</span>
+                    ) : (
+                      <span>Non</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };
