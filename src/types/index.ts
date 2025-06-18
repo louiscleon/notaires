@@ -2,7 +2,6 @@
 export type NotaireStatut = 'favori' | 'envisage' | 'non_interesse' | 'non_defini';
 
 export type ContactStatut = 
-  | 'non_contacte'
   | 'mail_envoye'
   | 'relance_envoyee'
   | 'reponse_recue'
@@ -39,29 +38,22 @@ export interface Notaire {
   adresse: string;
   codePostal: string;
   ville: string;
-  telephone: string;
   email: string;
-  siteWeb: string;
   statut: NotaireStatut;
-  dateContact: string;
-  dateRappel: string;
   notes: string;
   latitude: number;
   longitude: number;
-  needsGeocoding: boolean;
-  distance?: number;
-  score?: number;
   nbAssocies: number;
   nbSalaries: number;
   contacts: Contact[];
   dateModification?: string;
-  display_name?: string;
   geocodingHistory?: GeocodingHistory[];
   serviceNego: boolean;
   notairesAssocies: string;
   notairesSalaries: string;
   geoScore?: number;
   geoStatus?: 'pending' | 'success' | 'error';
+  needsGeocoding?: boolean; // Garde temporairement pour le géocodage
 }
 
 export interface VilleInteret {
@@ -86,6 +78,7 @@ export interface Filtres {
   statuts: NotaireStatut[];
   showOnlyWithEmail: boolean;
   contactStatuts: ContactStatut[];
+  showNonContactes: boolean; // Séparé des statuts de contact
 }
 
 export interface GeocodingResult {
@@ -98,19 +91,6 @@ export interface GeocodingResult {
 
 // Types pour les vues
 export type ViewMode = 'carte' | 'liste';
-
-// Types pour les statuts
-export type StatutContact = 'non_contacte' | 'envoye' | 'repondu' | 'relance' | 'cloture';
-
-export interface ContactInfo {
-  statut: StatutContact;
-  dateEnvoi?: Date;
-  reponse?: boolean;
-  reponsePositive?: boolean;
-  dateRelance?: Date;
-  reponseRelance?: boolean;
-  notes?: string;
-}
 
 // Service pour la persistance des données
 export interface StoredData {

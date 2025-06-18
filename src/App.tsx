@@ -146,9 +146,17 @@ const App: React.FC = () => {
   };
 
   const notairesFiltres = useMemo(() => {
-    console.log('=== DEBUG APP COMPONENT ===');
-    console.log('Total notaires before filtering:', notaires.length);
-    console.log('Filtres actuels:', filtres);
+    console.log('=== FILTERING NOTAIRES ===');
+    console.log('Total notaires:', notaires.length);
+    console.log('Filtres actifs:', {
+      typeNotaire: filtres.typeNotaire,
+      serviceNego: filtres.serviceNego,
+      statuts: filtres.statuts,
+      contactStatuts: filtres.contactStatuts,
+      showNonContactes: filtres.showNonContactes,
+      showOnlyWithEmail: filtres.showOnlyWithEmail,
+      showOnlyInRadius: filtres.showOnlyInRadius
+    });
 
     const filtered = notaires.filter((notaire: Notaire) => {
       // Filtre par type de notaire
@@ -168,77 +176,51 @@ const App: React.FC = () => {
       if (notaire.nbAssocies < filtres.minAssocies || notaire.nbAssocies > filtres.maxAssocies) return false;
       if (notaire.nbSalaries < filtres.minSalaries || notaire.nbSalaries > filtres.maxSalaries) return false;
 
-      // Filtre par statut
+      // Filtre par statut du notaire
       if (filtres.statuts.length > 0 && !filtres.statuts.includes(notaire.statut)) return false;
 
       // Filtre par email
       if (filtres.showOnlyWithEmail && !notaire.email) return false;
 
-      // Filtre par statut de contact
-      if (filtres.contactStatuts?.length > 0) {
-        const hasContacts = notaire.contacts && notaire.contacts.length > 0;
-        
-        // Si on filtre sur "non_contacte", on veut les notaires SANS contacts
-        if (filtres.contactStatuts.includes('non_contacte')) {
-          if (!hasContacts) {
-            // Ce notaire correspond au filtre "non_contacte", on continue avec les autres filtres
-          } else {
-            // Ce notaire a des contacts, on vérifie s'il correspond aux autres statuts demandés
-            const dernierContact = notaire.contacts[notaire.contacts.length - 1];
-            const autresStatuts = filtres.contactStatuts.filter(s => s !== 'non_contacte');
-            
-            if (autresStatuts.length === 0) {
-              // On filtre SEULEMENT sur "non_contacte" et ce notaire a des contacts
-              return false;
-            } else {
-              // On a d'autres statuts, vérifier si le dernier contact correspond
-              if (!autresStatuts.includes(dernierContact.statut as any)) {
-                return false;
-              }
-            }
-          }
+      // Filtre par statut de contact - logique simplifiée
+      const hasContacts = notaire.contacts && notaire.contacts.length > 0;
+      
+      // Si on veut voir les non contactés ET qu'il y a des statuts de contact sélectionnés
+      if (filtres.showNonContactes && filtres.contactStatuts.length > 0) {
+        // Afficher les non contactés OU ceux qui correspondent aux statuts
+        if (!hasContacts) {
+          // Non contacté - OK
         } else {
-          // On ne filtre PAS sur "non_contacte", donc on veut seulement les notaires avec contacts
-          if (!hasContacts) {
+          // A des contacts - vérifier le statut du dernier contact
+          const dernierContact = notaire.contacts[notaire.contacts.length - 1];
+          if (!filtres.contactStatuts.includes(dernierContact.statut)) {
             return false;
-          } else {
-            // Vérifier le statut du dernier contact
-            const dernierContact = notaire.contacts[notaire.contacts.length - 1];
-            if (!filtres.contactStatuts.includes(dernierContact.statut as any)) {
-              return false;
-            }
           }
         }
+      } else if (filtres.showNonContactes) {
+        // Seulement les non contactés
+        if (hasContacts) return false;
+      } else if (filtres.contactStatuts.length > 0) {
+        // Seulement ceux avec les statuts de contact spécifiés
+        if (!hasContacts) return false;
+        const dernierContact = notaire.contacts[notaire.contacts.length - 1];
+        if (!filtres.contactStatuts.includes(dernierContact.statut)) return false;
       }
 
       // Filtre par rayon des villes d'intérêt
       if (filtres.showOnlyInRadius && filtres.villesInteret.length > 0) {
-        // Vérifier si le notaire a des coordonnées
-        if (!notaire.latitude || !notaire.longitude) {
-          console.log('Notaire sans coordonnées:', notaire.officeNotarial);
-          return false;
-        }
+        if (!notaire.latitude || !notaire.longitude) return false;
 
-        // Vérifier si le notaire est dans le rayon d'au moins une ville d'intérêt
         const estDansRayon = filtres.villesInteret.some(ville => {
-          if (!ville.latitude || !ville.longitude) {
-            console.log('Ville sans coordonnées:', ville.nom);
-            return false;
-          }
-          
-          // On est sûr que les coordonnées existent à ce stade
-          const notaireLat = notaire.latitude as number;
-          const notaireLon = notaire.longitude as number;
-          const villeLat = ville.latitude as number;
-          const villeLon = ville.longitude as number;
+          if (!ville.latitude || !ville.longitude) return false;
           
           // Calcul de la distance (formule de Haversine)
           const R = 6371; // Rayon de la Terre en kilomètres
-          const dLat = (villeLat - notaireLat) * Math.PI / 180;
-          const dLon = (villeLon - notaireLon) * Math.PI / 180;
+          const dLat = (ville.latitude - notaire.latitude) * Math.PI / 180;
+          const dLon = (ville.longitude - notaire.longitude) * Math.PI / 180;
           const a = 
             Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(notaireLat * Math.PI / 180) * Math.cos(villeLat * Math.PI / 180) * 
+            Math.cos(notaire.latitude * Math.PI / 180) * Math.cos(ville.latitude * Math.PI / 180) * 
             Math.sin(dLon/2) * Math.sin(dLon/2);
           const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
           const distance = R * c;
@@ -246,17 +228,13 @@ const App: React.FC = () => {
           return distance <= ville.rayon;
         });
 
-        if (!estDansRayon) {
-          console.log('Notaire hors rayon:', notaire.officeNotarial);
-          return false;
-        }
+        if (!estDansRayon) return false;
       }
 
       return true;
     });
 
-    console.log('Notaires après filtrage:', filtered.length);
-    console.log('Exemple de notaire filtré:', filtered[0]);
+    console.log('Notaires filtrés:', filtered.length);
     return filtered;
   }, [notaires, filtres]);
 

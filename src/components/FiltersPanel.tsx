@@ -536,67 +536,78 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
 
         <div className="bg-white rounded-xl shadow-sm p-3 md:p-4 space-y-3 md:space-y-4">
           <h3 className="text-sm font-medium text-gray-900">Statut du contact</h3>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => toggleContactStatut('non_contacte')}
-              className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                filtres.contactStatuts?.includes('non_contacte')
-                  ? 'bg-gray-100 text-gray-800 ring-2 ring-gray-600'
-                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              📝 Non contacté
-            </button>
-            <button
-              onClick={() => toggleContactStatut('mail_envoye')}
-              className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                filtres.contactStatuts?.includes('mail_envoye')
-                  ? 'bg-blue-100 text-blue-800 ring-2 ring-blue-600'
-                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-blue-50'
-              }`}
-            >
-              📧 Mail envoyé
-            </button>
-            <button
-              onClick={() => toggleContactStatut('relance_envoyee')}
-              className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                filtres.contactStatuts?.includes('relance_envoyee')
-                  ? 'bg-yellow-100 text-yellow-800 ring-2 ring-yellow-600'
-                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-yellow-50'
-              }`}
-            >
-              🔄 Relance envoyée
-            </button>
-            <button
-              onClick={() => toggleContactStatut('reponse_recue')}
-              className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                filtres.contactStatuts?.includes('reponse_recue')
-                  ? 'bg-green-100 text-green-800 ring-2 ring-green-600'
-                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-green-50'
-              }`}
-            >
-              ✉️ Réponse reçue
-            </button>
-            <button
-              onClick={() => toggleContactStatut('cloture')}
-              className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                filtres.contactStatuts?.includes('cloture')
-                  ? 'bg-purple-100 text-purple-800 ring-2 ring-purple-600'
-                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-purple-50'
-              }`}
-            >
-              ✅ Clôturé
-            </button>
-            <button
-              onClick={() => onFiltresChange({ ...filtres, contactStatuts: [] })}
-              className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                !filtres.contactStatuts?.length
-                  ? 'bg-teal-100 text-teal-800 ring-2 ring-teal-600'
-                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-teal-50'
-              }`}
-            >
-              👥 Tous
-            </button>
+          
+          {/* Non contactés - case à cocher séparée */}
+          <div className="flex items-center space-x-3 pb-3 border-b border-gray-100">
+            <input
+              type="checkbox"
+              checked={filtres.showNonContactes}
+              onChange={(e) => onFiltresChange({
+                ...filtres,
+                showNonContactes: e.target.checked
+              })}
+              className="h-5 w-5 text-gray-600 focus:ring-gray-500 border-gray-300 rounded touch-checkbox"
+            />
+            <label className="text-sm text-gray-700 touch-label">
+              📝 Afficher les notaires non contactés
+            </label>
+          </div>
+
+          {/* Statuts de contact réels */}
+          <div>
+            <p className="text-xs text-gray-500 mb-2">Statuts de contact :</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => toggleContactStatut('mail_envoye')}
+                className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                  filtres.contactStatuts?.includes('mail_envoye')
+                    ? 'bg-blue-100 text-blue-800 ring-2 ring-blue-600'
+                    : 'bg-white text-gray-700 border border-gray-200 hover:bg-blue-50'
+                }`}
+              >
+                📧 Mail envoyé
+              </button>
+              <button
+                onClick={() => toggleContactStatut('relance_envoyee')}
+                className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                  filtres.contactStatuts?.includes('relance_envoyee')
+                    ? 'bg-yellow-100 text-yellow-800 ring-2 ring-yellow-600'
+                    : 'bg-white text-gray-700 border border-gray-200 hover:bg-yellow-50'
+                }`}
+              >
+                🔄 Relance envoyée
+              </button>
+              <button
+                onClick={() => toggleContactStatut('reponse_recue')}
+                className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                  filtres.contactStatuts?.includes('reponse_recue')
+                    ? 'bg-green-100 text-green-800 ring-2 ring-green-600'
+                    : 'bg-white text-gray-700 border border-gray-200 hover:bg-green-50'
+                }`}
+              >
+                ✉️ Réponse reçue
+              </button>
+              <button
+                onClick={() => toggleContactStatut('cloture')}
+                className={`touch-button px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                  filtres.contactStatuts?.includes('cloture')
+                    ? 'bg-purple-100 text-purple-800 ring-2 ring-purple-600'
+                    : 'bg-white text-gray-700 border border-gray-200 hover:bg-purple-50'
+                }`}
+              >
+                ✅ Clôturé
+              </button>
+            </div>
+            
+            {/* Bouton pour effacer les statuts de contact */}
+            {filtres.contactStatuts?.length > 0 && (
+              <button
+                onClick={() => onFiltresChange({ ...filtres, contactStatuts: [] })}
+                className="mt-2 w-full touch-button px-3 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200"
+              >
+                Effacer les statuts
+              </button>
+            )}
           </div>
         </div>
 
@@ -730,7 +741,8 @@ const FiltersPanel: React.FC<Props> = ({ filtres, onFiltresChange, notairesCount
           maxSalaries: 999,
           statuts: [],
           showOnlyWithEmail: false,
-          contactStatuts: []
+          contactStatuts: [],
+          showNonContactes: false
         })}
         className="w-full touch-button bg-gray-100 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-200 transition-colors duration-200 text-sm font-medium"
       >

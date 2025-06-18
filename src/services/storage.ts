@@ -1,7 +1,7 @@
 import { Filtres, NotaireStatut, ContactStatut, VilleInteret } from '../types';
 
 const STORAGE_KEY = 'notaires_app_data';
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 
 interface StorageData {
   version: string;
@@ -19,6 +19,7 @@ const defaultFiltres: Filtres = {
   statuts: [],
   showOnlyWithEmail: false,
   contactStatuts: [],
+  showNonContactes: false,
   showOnlyInRadius: false,
   villesInteret: [],
 };
@@ -87,8 +88,13 @@ function loadData(): StorageData {
       };
     }
 
-    // Valider les filtres
-    if (!isValidFiltres(data.filtres)) {
+    // Valider les filtres et merger avec les defaults pour les nouveaux champs
+    const mergedFiltres = {
+      ...defaultFiltres,
+      ...data.filtres
+    };
+
+    if (!isValidFiltres(mergedFiltres)) {
       console.warn('Données de filtres invalides, réinitialisation...');
       return {
         version: VERSION,
@@ -98,10 +104,7 @@ function loadData(): StorageData {
 
     return {
       version: VERSION,
-      filtres: {
-        ...defaultFiltres,
-        ...data.filtres
-      },
+      filtres: mergedFiltres,
       lastSync: data.lastSync
     };
   } catch (error) {
@@ -121,7 +124,6 @@ function saveFiltres(filtres: Filtres): void {
       return;
     }
 
-    const currentData = loadData();
     const dataToSave: StorageData = {
       version: VERSION,
       filtres: {

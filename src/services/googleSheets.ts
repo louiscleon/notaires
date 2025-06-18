@@ -441,7 +441,7 @@ function parseNotaire(row: any[]): Notaire {
             date: new Date().toISOString(),
             type: 'initial',
             par: 'Fanny',
-            statut: 'non_contacte',
+            statut: 'mail_envoye',
             reponseRecue: {
               date: new Date().toISOString(),
               positive: false,
@@ -465,9 +465,7 @@ function parseNotaire(row: any[]): Notaire {
     adresse: adresse || '',
     codePostal: codePostal || '',
     ville: ville || '',
-    telephone: '', // Cette colonne n'existe plus dans la nouvelle structure
     email: email || '',
-    siteWeb: '', // Cette colonne n'existe plus dans la nouvelle structure
     statut: (() => {
       const normalizedStatut = String(statut || '').toLowerCase().trim();
       
@@ -489,8 +487,6 @@ function parseNotaire(row: any[]): Notaire {
       const finalStatut = statutMap[normalizedStatut] || 'non_defini';
       return finalStatut;
     })(),
-    dateContact: new Date().toISOString(), // Valeur par défaut
-    dateRappel: new Date().toISOString(), // Valeur par défaut
     notes: notes || '',
     latitude: parseCoordinate(latitude) ?? 0,
     longitude: parseCoordinate(longitude) ?? 0,
