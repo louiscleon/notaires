@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { Notaire, NotaireStatut } from '../types';
-import SearchBar from './SearchBar';
 
 interface Props {
   notaires: Notaire[];
@@ -25,7 +24,6 @@ const statusLabels: Record<NotaireStatut, string> = {
 
 const NotairesTable: React.FC<Props> = ({ notaires, onNotaireClick, selectedNotaire, onStatutChange }) => {
   const [openStatusMenu, setOpenStatusMenu] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
 
   const handleStatutClick = (e: React.MouseEvent, notaire: Notaire) => {
     e.stopPropagation();
@@ -37,25 +35,6 @@ const NotairesTable: React.FC<Props> = ({ notaires, onNotaireClick, selectedNota
     onStatutChange(notaire, newStatut);
     setOpenStatusMenu(null);
   };
-
-  const filteredNotaires = useMemo(() => {
-    if (!searchQuery) return notaires;
-    
-    const searchTerms = searchQuery.toLowerCase().split(' ');
-    return notaires.filter(notaire => {
-      const searchableText = `
-        ${notaire.officeNotarial}
-        ${notaire.adresse}
-        ${notaire.codePostal}
-        ${notaire.ville}
-        ${notaire.email || ''}
-        ${notaire.notairesAssocies || ''}
-        ${notaire.notairesSalaries || ''}
-      `.toLowerCase();
-
-      return searchTerms.every(term => searchableText.includes(term));
-    });
-  }, [notaires, searchQuery]);
 
   const renderStatusButton = (notaire: Notaire) => (
     <button
@@ -133,15 +112,9 @@ const NotairesTable: React.FC<Props> = ({ notaires, onNotaireClick, selectedNota
 
   return (
     <div className="space-y-4">
-      <SearchBar
-        value={searchQuery}
-        onChange={setSearchQuery}
-        resultCount={filteredNotaires.length}
-      />
-
       {/* Vue mobile en cartes */}
       <div className="md:hidden space-y-3">
-        {filteredNotaires.map(renderMobileCard)}
+        {notaires.map(renderMobileCard)}
       </div>
 
       {/* Vue desktop en tableau */}
@@ -167,7 +140,7 @@ const NotairesTable: React.FC<Props> = ({ notaires, onNotaireClick, selectedNota
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {filteredNotaires.map((notaire) => (
+            {notaires.map((notaire) => (
               <tr
                 key={notaire.id}
                 onClick={() => onNotaireClick(notaire)}

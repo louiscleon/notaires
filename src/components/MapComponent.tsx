@@ -4,7 +4,6 @@ import { Notaire, VilleInteret, NotaireStatut } from '../types';
 import { geocodeBatch } from '../services/geocoding';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import SearchBar from './SearchBar';
 
 // Fonction utilitaire pure pour calculer la distance (formule de Haversine)
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -103,7 +102,6 @@ const MapComponent: React.FC<Props> = ({
   const [initialZoom] = useState(8);
   const [notairesAvecCoordonnees, setNotairesAvecCoordonnees] = useState<Notaire[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const geocodingRef = useRef<boolean>(false);
   const initialGeocodingDone = useRef<boolean>(false);
   const notairesRef = useRef<Map<string, Notaire>>(new Map());
@@ -172,68 +170,14 @@ const MapComponent: React.FC<Props> = ({
     });
   }, []);
 
-  const filteredNotaires = useMemo(() => {
-    if (!searchQuery) return notaires;
-    
-    const searchTerms = searchQuery.toLowerCase().split(' ');
-    return notaires.filter(notaire => {
-      const searchableText = `
-        ${notaire.officeNotarial}
-        ${notaire.adresse}
-        ${notaire.codePostal}
-        ${notaire.ville}
-        ${notaire.email || ''}
-        ${notaire.notairesAssocies || ''}
-        ${notaire.notairesSalaries || ''}
-      `.toLowerCase();
-
-      return searchTerms.every(term => searchableText.includes(term));
-    });
-  }, [notaires, searchQuery]);
-
-  // Mémoriser la fonction de création du contenu du popup
-  const createPopupContent = useCallback((notaire: Notaire) => {
-    return `
-      <div class="p-3 max-w-xs bg-white rounded-lg shadow-lg border border-gray-100">
-        <h3 class="text-sm font-semibold text-gray-900 mb-1">
-          ${notaire.officeNotarial}
-        </h3>
-        <p class="text-xs text-gray-600">${notaire.adresse}</p>
-        <p class="text-xs text-gray-600">${notaire.codePostal} ${notaire.ville}</p>
-        <div class="mt-2 flex items-center justify-between text-xs">
-          <span class="text-teal-600">${notaire.nbAssocies} associé${notaire.nbAssocies > 1 ? 's' : ''}</span>
-          <span class="text-blue-600">${notaire.nbSalaries} salarié${notaire.nbSalaries > 1 ? 's' : ''}</span>
-        </div>
-      </div>
-    `;
-  }, []);
-
-  // Mémoriser les gestionnaires d'événements des marqueurs
-  const markerEventHandlers = useCallback((notaire: Notaire) => ({
-    click: () => onNotaireClick?.(notaire),
-    mouseover: (e: L.LeafletMouseEvent) => {
-      const popup = L.popup({
-        className: 'custom-popup-preview',
-        offset: [0, -20],
-        closeButton: false,
-      })
-        .setLatLng(e.target.getLatLng())
-        .setContent(createPopupContent(notaire));
-      e.target.bindPopup(popup).openPopup();
-    },
-    mouseout: (e: L.LeafletMouseEvent) => {
-      e.target.closePopup();
-    }
-  }), [onNotaireClick, createPopupContent]);
-
   // Effect pour gérer les notaires avec et sans coordonnées
   useEffect(() => {
     // Mettre à jour la référence des notaires
-    const notairesMap = new Map(filteredNotaires.map(n => [n.id, n]));
+    const notairesMap = new Map(notaires.map(n => [n.id, n]));
     notairesRef.current = notairesMap;
 
     // Filtrer les notaires qui ont déjà des coordonnées valides
-    let notairesValides = filteredNotaires.filter(n =>
+    let notairesValides = notaires.filter(n =>
       typeof n.latitude === 'number' &&
       typeof n.longitude === 'number' &&
       !isNaN(n.latitude) &&
@@ -245,7 +189,7 @@ const MapComponent: React.FC<Props> = ({
 
     // Ne faire le géocodage que pour les notaires qui n'ont pas d'adresse ou dont l'adresse a changé
     if (!initialGeocodingDone.current && !geocodingRef.current) {
-      const notairesAGeocoder = filteredNotaires.filter(n => 
+      const notairesAGeocoder = notaires.filter(n => 
         !n.latitude || !n.longitude || // Pas de coordonnées
         !n.adresse || !n.codePostal || !n.ville || // Pas d'adresse complète
         n.needsGeocoding // Adresse modifiée
@@ -286,7 +230,7 @@ const MapComponent: React.FC<Props> = ({
         initialGeocodingDone.current = true;
       }
     }
-  }, [filteredNotaires, onNotaireUpdate]);
+  }, [notaires, onNotaireUpdate]);
 
   // Filtrer les notaires selon le rayon si nécessaire
   const notairesToDisplay = useMemo(() => {
@@ -296,12 +240,6 @@ const MapComponent: React.FC<Props> = ({
 
   return (
     <div className="space-y-4">
-      <SearchBar
-        value={searchQuery}
-        onChange={setSearchQuery}
-        resultCount={notairesAvecCoordonnees.length}
-      />
-      
       <div className="relative w-full h-full" style={{ zIndex: 0 }}>
         {loading && (
           <div className="absolute top-4 right-4 z-10 bg-white px-4 py-2 rounded-lg shadow-lg">

@@ -11,6 +11,7 @@ import Dashboard from './components/Dashboard';
 import Toast from './components/Toast';
 import Logo from './components/Logo';
 import { notaireService } from './services/notaireService';
+import SearchBar from './components/SearchBar';
 
 interface ToastMessage {
   message: string;
@@ -29,6 +30,7 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isEditing, setIsEditing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const addToast = (message: string, type: 'error' | 'success' | 'warning') => {
     const id = Date.now();
@@ -154,10 +156,28 @@ const App: React.FC = () => {
       contactStatuts: filtres.contactStatuts,
       showNonContactes: filtres.showNonContactes,
       showOnlyWithEmail: filtres.showOnlyWithEmail,
-      showOnlyInRadius: filtres.showOnlyInRadius
+      showOnlyInRadius: filtres.showOnlyInRadius,
+      searchQuery: searchQuery
     });
 
     const filtered = notaires.filter((notaire: Notaire) => {
+      // Filtre par recherche textuelle
+      if (searchQuery) {
+        const searchTerms = searchQuery.toLowerCase().split(' ');
+        const searchableText = `
+          ${notaire.officeNotarial}
+          ${notaire.adresse}
+          ${notaire.codePostal}
+          ${notaire.ville}
+          ${notaire.email || ''}
+          ${notaire.notairesAssocies || ''}
+          ${notaire.notairesSalaries || ''}
+        `.toLowerCase();
+
+        const matchesSearch = searchTerms.every(term => searchableText.includes(term));
+        if (!matchesSearch) return false;
+      }
+
       // Filtre par type de notaire
       if (filtres.typeNotaire !== 'tous') {
         const estGroupe = notaire.nbAssocies > 1;
@@ -261,7 +281,7 @@ const App: React.FC = () => {
     }
     
     return filtered;
-  }, [notaires, filtres]);
+  }, [notaires, filtres, searchQuery]);
 
   const handleCloseModal = () => {
     setSelectedNotaire(null);
@@ -381,45 +401,16 @@ const App: React.FC = () => {
           isMenuOpen={isMenuOpen}
         />
 
-        {/* TEST TEMPORAIRE - À SUPPRIMER */}
-        <div className="p-4 bg-yellow-100 border border-yellow-300 rounded-lg m-4">
-          <p className="text-sm font-medium text-yellow-800 mb-2">🧪 Tests de filtrage (temporaire) :</p>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => {
-                console.log('🧪 TEST: Activation filtre non contactés');
-                setFiltres({...filtres, showNonContactes: true, contactStatuts: []});
-              }}
-              className="px-3 py-1 bg-gray-600 text-white rounded text-sm"
-            >
-              Tester Non contactés
-            </button>
-            <button
-              onClick={() => {
-                console.log('🧪 TEST: Réinitialisation filtres');
-                setFiltres({...filtres, showNonContactes: false, contactStatuts: []});
-              }}
-              className="px-3 py-1 bg-red-600 text-white rounded text-sm"
-            >
-              Reset filtres contact
-            </button>
-            <button
-              onClick={() => {
-                console.log('🧪 TEST: Filtrage mail envoyé');
-                setFiltres({...filtres, showNonContactes: false, contactStatuts: ['mail_envoye']});
-              }}
-              className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
-            >
-              Tester Mail envoyé
-            </button>
-          </div>
-          <p className="text-xs text-yellow-700 mt-1">
-            Filtres actuels: showNonContactes={filtres.showNonContactes ? 'true' : 'false'}, 
-            contactStatuts=[{filtres.contactStatuts.join(', ')}]
-          </p>
-        </div>
-
         <div className="p-4 lg:p-8">
+          {/* Barre de recherche globale */}
+          <div className="mb-4">
+            <SearchBar
+              value={searchQuery}
+              onChange={setSearchQuery}
+              resultCount={notairesFiltres.length}
+            />
+          </div>
+
           {viewMode === 'carte' ? (
             <div className="space-y-4 lg:space-y-8">
               <div className="bg-white rounded-lg shadow-lg p-4">
@@ -430,14 +421,6 @@ const App: React.FC = () => {
               </div>
               <div className="bg-white rounded-lg shadow-lg overflow-hidden">
                 <div className="h-[calc(100vh-16rem)] md:h-[600px] lg:h-[600px]">
-                  {(() => {
-                    if (filtres.villesInteret && filtres.villesInteret.length > 0) {
-                      const v = filtres.villesInteret[0];
-                      console.log(`[DEBUG] Première ville d'intérêt: ${v.nom}, lat: ${v.latitude}, lon: ${v.longitude}`);
-                    } else {
-                      console.log('[DEBUG] Aucune ville d\'intérêt dans filtres.villesInteret');
-                    }
-                    return (
                   <MapComponent
                     notaires={notairesFiltres}
                     villesInteret={filtres.villesInteret}
@@ -445,8 +428,6 @@ const App: React.FC = () => {
                     onNotaireUpdate={handleNotaireUpdate}
                     showOnlyInRadius={filtres.showOnlyInRadius}
                   />
-                    );
-                  })()}
                 </div>
               </div>
             </div>
@@ -489,4 +470,4 @@ const App: React.FC = () => {
   );
 };
 
-export default App; 
+export default App;
