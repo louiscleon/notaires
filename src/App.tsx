@@ -176,13 +176,38 @@ const App: React.FC = () => {
 
       // Filtre par statut de contact
       if (filtres.contactStatuts?.length > 0) {
-        // Si le notaire n'a pas de contacts, il est considéré comme "non_contacte"
-        if (!notaire.contacts || notaire.contacts.length === 0) {
-          if (!filtres.contactStatuts.includes('non_contacte')) return false;
+        const hasContacts = notaire.contacts && notaire.contacts.length > 0;
+        
+        // Si on filtre sur "non_contacte", on veut les notaires SANS contacts
+        if (filtres.contactStatuts.includes('non_contacte')) {
+          if (!hasContacts) {
+            // Ce notaire correspond au filtre "non_contacte", on continue avec les autres filtres
+          } else {
+            // Ce notaire a des contacts, on vérifie s'il correspond aux autres statuts demandés
+            const dernierContact = notaire.contacts[notaire.contacts.length - 1];
+            const autresStatuts = filtres.contactStatuts.filter(s => s !== 'non_contacte');
+            
+            if (autresStatuts.length === 0) {
+              // On filtre SEULEMENT sur "non_contacte" et ce notaire a des contacts
+              return false;
+            } else {
+              // On a d'autres statuts, vérifier si le dernier contact correspond
+              if (!autresStatuts.includes(dernierContact.statut as any)) {
+                return false;
+              }
+            }
+          }
         } else {
-          // Prendre le statut du dernier contact
-          const dernierContact = notaire.contacts[notaire.contacts.length - 1];
-          if (!filtres.contactStatuts.includes(dernierContact.statut)) return false;
+          // On ne filtre PAS sur "non_contacte", donc on veut seulement les notaires avec contacts
+          if (!hasContacts) {
+            return false;
+          } else {
+            // Vérifier le statut du dernier contact
+            const dernierContact = notaire.contacts[notaire.contacts.length - 1];
+            if (!filtres.contactStatuts.includes(dernierContact.statut as any)) {
+              return false;
+            }
+          }
         }
       }
 
