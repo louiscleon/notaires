@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Notaire } from '../types';
 
 interface Props {
@@ -30,45 +30,66 @@ const StatCard: React.FC<{
 const Dashboard: React.FC<Props> = ({ notaires, onNotaireClick }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // Calcul des statistiques
+  // CORRECTION : Dédupliquer les notaires par ID dès le début
+  const notairesUniques = useMemo(() => {
+    const uniqueMap = new Map<string, Notaire>();
+    let duplicatesFound = 0;
+    
+    notaires.forEach(notaire => {
+      if (uniqueMap.has(notaire.id)) {
+        duplicatesFound++;
+        console.warn(`🔍 Doublon détecté pour ${notaire.officeNotarial} (ID: ${notaire.id})`);
+      } else {
+        uniqueMap.set(notaire.id, notaire);
+      }
+    });
+    
+    if (duplicatesFound > 0) {
+      console.warn(`⚠️ ${duplicatesFound} doublon(s) détecté(s) dans les données - dédupliqués automatiquement`);
+    }
+    
+    return Array.from(uniqueMap.values());
+  }, [notaires]);
+
+  // Calcul des statistiques avec les notaires dédupliqués
   const stats: StatCard[] = [
     {
       title: 'Total Notaires',
-      value: notaires.length,
+      value: notairesUniques.length,
       description: 'Nombre total d\'études',
       color: 'bg-emerald-50'
     },
     {
       title: 'Favoris',
-      value: notaires.filter(n => n.statut === 'favori').length,
+      value: notairesUniques.filter(n => n.statut === 'favori').length,
       description: 'Études favorites',
       color: 'bg-amber-50'
     },
     {
       title: 'À envisager',
-      value: notaires.filter(n => n.statut === 'envisage').length,
+      value: notairesUniques.filter(n => n.statut === 'envisage').length,
       description: 'Études à étudier',
       color: 'bg-blue-50'
     },
     {
       title: 'Contactés',
-      value: notaires.filter(n => n.contacts?.length > 0).length,
+      value: notairesUniques.filter(n => n.contacts?.length > 0).length,
       description: 'Études déjà contactées',
       color: 'bg-purple-50'
     }
   ];
 
   const contactStats = {
-    total: notaires.filter(n => n.contacts?.length > 0).length,
-    reponses: notaires.filter(n => n.contacts?.some(c => c.reponseRecue)).length,
-    positives: notaires.filter(n => n.contacts?.some(c => c.reponseRecue?.positive)).length
+    total: notairesUniques.filter(n => n.contacts?.length > 0).length,
+    reponses: notairesUniques.filter(n => n.contacts?.some(c => c.reponseRecue)).length,
+    positives: notairesUniques.filter(n => n.contacts?.some(c => c.reponseRecue?.positive)).length
   };
 
   const tauxReponse = contactStats.total > 0
     ? Math.round((contactStats.reponses / contactStats.total) * 100)
     : 0;
 
-  const prochaines = notaires
+  const prochaines = notairesUniques
     .filter(n => n.contacts?.length > 0)
     .sort((a, b) => {
       const dateA = new Date(a.contacts[a.contacts.length - 1].date);
@@ -91,7 +112,7 @@ const Dashboard: React.FC<Props> = ({ notaires, onNotaireClick }) => {
             <span className="font-medium text-gray-900">Afficher le tableau de bord</span>
           </div>
           <div className="text-sm text-gray-500">
-            {notaires.length} notaires • {stats[1].value} favoris • {stats[2].value} à envisager
+            {notairesUniques.length} notaires • {stats[1].value} favoris • {stats[2].value} à envisager
           </div>
         </div>
       </button>
