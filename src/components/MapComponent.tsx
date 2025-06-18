@@ -100,12 +100,11 @@ const MapComponent: React.FC<Props> = ({
 }) => {
   const [center] = useState<[number, number]>([47.8, -2.8]);
   const [initialZoom] = useState(8);
-  const [notairesAvecCoordonnees, setNotairesAvecCoordonnees] = useState<Notaire[]>([]);
   const [loading, setLoading] = useState(false);
   const geocodingRef = useRef<boolean>(false);
   const initialGeocodingDone = useRef<boolean>(false);
-  const notairesRef = useRef<Map<string, Notaire>>(new Map());
-  const updatedNotairesRef = useRef<Set<Notaire>>(new Set());
+
+  console.log('🗺️ MapComponent: Rendu avec', notaires.length, 'notaires reçus');
 
   // Configuration des icônes mémorisée
   const iconConfigs = useMemo(() => ({
@@ -170,31 +169,8 @@ const MapComponent: React.FC<Props> = ({
     });
   }, []);
 
-  // Effect pour gérer les notaires avec et sans coordonnées
+  // Géocodage en arrière-plan pour les notaires sans coordonnées
   useEffect(() => {
-    console.log('🗺️ MapComponent: Mise à jour des notaires', {
-      notairesReçus: notaires.length,
-      notairesAvecCoordonneesActuels: notairesAvecCoordonnees.length
-    });
-
-    // Mettre à jour la référence des notaires
-    const notairesMap = new Map(notaires.map(n => [n.id, n]));
-    notairesRef.current = notairesMap;
-
-    // Filtrer les notaires qui ont déjà des coordonnées valides
-    let notairesValides = notaires.filter(n =>
-      typeof n.latitude === 'number' &&
-      typeof n.longitude === 'number' &&
-      !isNaN(n.latitude) &&
-      !isNaN(n.longitude)
-    );
-    
-    console.log('🗺️ MapComponent: Notaires valides avec coordonnées:', notairesValides.length);
-    
-    // Mettre à jour les notaires avec coordonnées IMMÉDIATEMENT
-    setNotairesAvecCoordonnees(notairesValides);
-
-    // Ne faire le géocodage que pour les notaires qui n'ont pas d'adresse ou dont l'adresse a changé
     if (!initialGeocodingDone.current && !geocodingRef.current) {
       const notairesAGeocoder = notaires.filter(n => 
         !n.latitude || !n.longitude || // Pas de coordonnées
@@ -203,60 +179,51 @@ const MapComponent: React.FC<Props> = ({
       );
 
       if (notairesAGeocoder.length > 0) {
-        console.log('🗺️ MapComponent: Géocodage de', notairesAGeocoder.length, 'notaires');
+        console.log('🗺️ MapComponent: Géocodage de', notairesAGeocoder.length, 'notaires en arrière-plan');
         geocodingRef.current = true;
         setLoading(true);
 
-        geocodeBatch(notairesAGeocoder, (updatedNotaire) => {
-          // Mettre à jour le notaire dans la référence
-          notairesRef.current.set(updatedNotaire.id, updatedNotaire);
-          updatedNotairesRef.current.add(updatedNotaire);
-
-          // Mettre à jour le notaire dans le state
-          setNotairesAvecCoordonnees(prev => {
-            const newNotaires = [...prev];
-            const index = newNotaires.findIndex(n => n.id === updatedNotaire.id);
-            if (index !== -1) {
-              newNotaires[index] = updatedNotaire;
-            } else if (updatedNotaire.latitude && updatedNotaire.longitude) {
-              newNotaires.push(updatedNotaire);
-            }
-            return newNotaires;
+        geocodeBatch(notairesAGeocoder, onNotaireUpdate || (() => {}))
+          .then(() => {
+            console.log('🗺️ MapComponent: Géocodage terminé');
+            geocodingRef.current = false;
+            setLoading(false);
+            initialGeocodingDone.current = true;
+          })
+          .catch(error => {
+            console.error('🗺️ MapComponent: Erreur de géocodage:', error);
+            geocodingRef.current = false;
+            setLoading(false);
           });
-
-          // Appeler le callback de mise à jour
-          onNotaireUpdate?.(updatedNotaire);
-        }).then(() => {
-          geocodingRef.current = false;
-          setLoading(false);
-          initialGeocodingDone.current = true;
-        }).catch(error => {
-          geocodingRef.current = false;
-          setLoading(false);
-        });
       } else {
         initialGeocodingDone.current = true;
       }
     }
   }, [notaires, onNotaireUpdate]);
 
-  // Filtrer les notaires selon le rayon si nécessaire
+  // Calculer directement les notaires à afficher
   const notairesToDisplay = useMemo(() => {
-    console.log('🗺️ MapComponent: Calcul des notaires à afficher', {
-      notairesAvecCoordonnees: notairesAvecCoordonnees.length,
-      showOnlyInRadius: showOnlyInRadius,
-      villesInteretCount: villesInteret.length
-    });
+    // Filtrer les notaires qui ont des coordonnées valides
+    let notairesValides = notaires.filter(n =>
+      typeof n.latitude === 'number' &&
+      typeof n.longitude === 'number' &&
+      !isNaN(n.latitude) &&
+      !isNaN(n.longitude) &&
+      n.latitude !== 0 &&
+      n.longitude !== 0
+    );
 
-    if (!showOnlyInRadius) {
-      console.log('🗺️ MapComponent: Affichage de tous les notaires avec coordonnées:', notairesAvecCoordonnees.length);
-      return notairesAvecCoordonnees;
+    console.log('🗺️ MapComponent: Notaires avec coordonnées valides:', notairesValides.length);
+
+    // Appliquer le filtre de rayon si nécessaire
+    if (showOnlyInRadius && villesInteret.length > 0) {
+      notairesValides = notairesValides.filter(notaire => isNotaireInRadius(notaire, villesInteret));
+      console.log('🗺️ MapComponent: Notaires dans le rayon:', notairesValides.length);
     }
-    
-    const filtered = notairesAvecCoordonnees.filter(notaire => isNotaireInRadius(notaire, villesInteret));
-    console.log('🗺️ MapComponent: Affichage des notaires dans le rayon:', filtered.length);
-    return filtered;
-  }, [notairesAvecCoordonnees, showOnlyInRadius, villesInteret, isNotaireInRadius]);
+
+    console.log('🗺️ MapComponent: Notaires finaux à afficher:', notairesValides.length);
+    return notairesValides;
+  }, [notaires, showOnlyInRadius, villesInteret, isNotaireInRadius]);
 
   return (
     <div className="space-y-4">
