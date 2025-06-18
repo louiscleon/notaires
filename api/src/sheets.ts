@@ -43,6 +43,65 @@ async function processWriteQueue() {
   }
 }
 
+// **NOUVELLE FONCTION : TROUVER LA LIGNE D'UN NOTAIRE SPECIFIQUE**
+async function findNotaireRow(notaireId: string): Promise<number | null> {
+  try {
+    console.log(`🔍 Recherche de la ligne pour le notaire ID: ${notaireId}`);
+    
+    // Récupérer seulement la colonne des IDs (colonne A)
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'Notaires!A2:A', // Seulement la colonne des IDs
+    });
+
+    if (!response.data.values) {
+      console.log('Aucune donnée trouvée');
+      return null;
+    }
+
+    // Chercher l'ID dans les données
+    const rows = response.data.values;
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i][0] === notaireId) {
+        const rowNumber = i + 2; // +2 car on commence à la ligne 2
+        console.log(`✅ Notaire trouvé à la ligne ${rowNumber}`);
+        return rowNumber;
+      }
+    }
+
+    console.log(`❌ Notaire avec ID ${notaireId} non trouvé`);
+    return null;
+  } catch (error) {
+    console.error('Erreur lors de la recherche de ligne:', error);
+    throw error;
+  }
+}
+
+// **NOUVELLE FONCTION : MODIFIER UNE LIGNE SPECIFIQUE**
+async function updateSpecificRow(rowNumber: number, values: any[]): Promise<any> {
+  try {
+    console.log(`💾 Modification de la ligne ${rowNumber} avec ${values.length} colonnes`);
+    
+    // Construire la plage pour cette ligne spécifique (ex: "Notaires!A15:T15")  
+    const range = `Notaires!A${rowNumber}:T${rowNumber}`;
+    
+    const response = await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: range,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { 
+        values: [values] // Tableau de tableaux, même pour une seule ligne
+      },
+    });
+
+    console.log(`✅ Ligne ${rowNumber} modifiée avec succès`);
+    return response.data;
+  } catch (error) {
+    console.error(`❌ Erreur modification ligne ${rowNumber}:`, error);
+    throw error;
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Ensure we always send JSON responses
   res.setHeader('Content-Type', 'application/json');
@@ -119,7 +178,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       case 'POST': {
-        const { range: writeRange, values } = req.body;
+        const { range: writeRange, values, notaireId, mode } = req.body;
+        
+        // **NOUVEAU : Mode de modification spécifique par notaire**
+        if (mode === 'update-single' && notaireId && values && values.length === 1) {
+          return new Promise((resolve) => {
+            const operation = async () => {
+              try {
+                console.log(`🎯 Mode modification spécifique pour notaire: ${notaireId}`);
+                
+                // Trouver la ligne du notaire
+                const rowNumber = await findNotaireRow(notaireId);
+                if (!rowNumber) {
+                  resolve(res.status(404).json({
+                    error: true,
+                    message: `Notaire avec ID ${notaireId} non trouvé`
+                  }));
+                  return;
+                }
+
+                // Modifier seulement cette ligne
+                const result = await updateSpecificRow(rowNumber, values[0]);
+                
+                resolve(res.status(200).json({
+                  error: false,
+                  data: result,
+                  rowNumber: rowNumber,
+                  message: `Ligne ${rowNumber} modifiée avec succès`
+                }));
+              } catch (e) {
+                const error = e as Error;
+                console.error('Erreur modification spécifique:', error);
+                resolve(res.status(500).json({
+                  error: true,
+                  message: `Erreur modification: ${error.message}`
+                }));
+              }
+            };
+
+            writeQueue.push(operation);
+            processWriteQueue();
+          });
+        }
+        
+        // **MODE CLASSIQUE (DANGEREUX) - Seulement pour compatibilité**
         if (!writeRange || !values) {
           return res.status(400).json({
             error: true,
@@ -130,6 +232,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return new Promise((resolve) => {
           const operation = async () => {
             try {
+              console.log('⚠️ ATTENTION: Mode écriture globale (potentiellement dangereux)');
               console.log('Writing data:', {
                 range: writeRange,
                 valueCount: values.length,

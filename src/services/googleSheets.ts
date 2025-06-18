@@ -294,56 +294,113 @@ export const googleSheetsService = {
     });
   },
 
-  // **SAUVEGARDE SIMPLIFIEE SANS DEBOUNCE**
+  // **SAUVEGARDE SÉCURISÉE LIGNE PAR LIGNE**
   async saveToSheet(notaire: Notaire | Notaire[]): Promise<void> {
     const notaires = Array.isArray(notaire) ? notaire : [notaire];
     
-    console.log(`💾 Sauvegarde de ${notaires.length} notaire(s)...`);
+    console.log(`💾 Sauvegarde sécurisée de ${notaires.length} notaire(s)...`);
     
-    try {
-      // **CONVERSION EN FORMAT GOOGLE SHEETS**
-      const values = notaires.map(n => [
-        n.id,
-        n.officeNotarial,
-        n.adresse,
-        n.codePostal,
-        n.ville,
-        n.departement,
-        n.email,
-        n.notairesAssocies,
-        n.notairesSalaries,
-        n.nbAssocies,
-        n.nbSalaries,
-        n.serviceNego ? 'oui' : 'non',
-        n.statut,
-        n.notes,
-        JSON.stringify(n.contacts || []),
-        n.dateModification,
-        n.latitude,
-        n.longitude,
-        n.geoScore,
-        JSON.stringify(n.geocodingHistory || [])
-      ]);
+    // **SI UN SEUL NOTAIRE : Mode sécurisé ligne spécifique**
+    if (notaires.length === 1) {
+      const n = notaires[0];
+      console.log(`🎯 Mode sécurisé : modification ligne spécifique pour ${n.officeNotarial}`);
       
-      const response = await simpleFetch(`${API_BASE_URL}/sheets`, {
-        method: 'POST',
-        body: JSON.stringify({ 
-          range: SHEET_RANGES.NOTAIRES,
-          values
-        }),
-      });
-      
-      const result = await response.json();
-      
-      if (result.error) {
-        throw new Error(result.message || 'Erreur lors de la sauvegarde');
+      try {
+        // **CONVERSION EN FORMAT GOOGLE SHEETS POUR UNE LIGNE**
+        const values = [[
+          n.id,
+          n.officeNotarial,
+          n.adresse,
+          n.codePostal,
+          n.ville,
+          n.departement,
+          n.email,
+          n.notairesAssocies,
+          n.notairesSalaries,
+          n.nbAssocies,
+          n.nbSalaries,
+          n.serviceNego ? 'oui' : 'non',
+          n.statut,
+          n.notes,
+          JSON.stringify(n.contacts || []),
+          n.dateModification,
+          n.latitude,
+          n.longitude,
+          n.geoScore,
+          JSON.stringify(n.geocodingHistory || [])
+        ]];
+        
+        const response = await simpleFetch(`${API_BASE_URL}/sheets`, {
+          method: 'POST',
+          body: JSON.stringify({ 
+            mode: 'update-single',
+            notaireId: n.id,
+            values
+          }),
+        });
+        
+        const result = await response.json();
+        
+        if (result.error) {
+          throw new Error(result.message || 'Erreur lors de la sauvegarde');
+        }
+        
+        console.log(`✅ Ligne ${result.rowNumber} modifiée avec succès pour ${n.officeNotarial}`);
+        
+      } catch (error) {
+        console.error(`❌ Erreur sauvegarde sécurisée:`, error);
+        throw error;
       }
+    } 
+    // **SI PLUSIEURS NOTAIRES : Mode global (avec avertissement)**
+    else {
+      console.warn(`⚠️ ATTENTION: Sauvegarde globale de ${notaires.length} notaires (potentiellement dangereux)`);
       
-      console.log(`✅ Sauvegarde réussie`);
-      
-    } catch (error) {
-      console.error(`❌ Erreur lors de la sauvegarde:`, error);
-      throw error;
+      try {
+        // **CONVERSION EN FORMAT GOOGLE SHEETS**
+        const values = notaires.map(n => [
+          n.id,
+          n.officeNotarial,
+          n.adresse,
+          n.codePostal,
+          n.ville,
+          n.departement,
+          n.email,
+          n.notairesAssocies,
+          n.notairesSalaries,
+          n.nbAssocies,
+          n.nbSalaries,
+          n.serviceNego ? 'oui' : 'non',
+          n.statut,
+          n.notes,
+          JSON.stringify(n.contacts || []),
+          n.dateModification,
+          n.latitude,
+          n.longitude,
+          n.geoScore,
+          JSON.stringify(n.geocodingHistory || [])
+        ]);
+        
+        const response = await simpleFetch(`${API_BASE_URL}/sheets`, {
+          method: 'POST',
+          body: JSON.stringify({ 
+            range: SHEET_RANGES.NOTAIRES,
+            values
+          }),
+        });
+        
+        const result = await response.json();
+        
+        if (result.error) {
+          throw new Error(result.message || 'Erreur lors de la sauvegarde');
+        }
+        
+        console.log(`✅ Sauvegarde globale réussie (${notaires.length} notaires)`);
+        
+      } catch (error) {
+        console.error(`❌ Erreur lors de la sauvegarde globale:`, error);
+        throw error;
+      }
     }
   },
 
