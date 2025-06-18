@@ -1,4 +1,4 @@
-import { Filtres, NotaireStatut, ContactStatut, VilleInteret } from '../types';
+import { Filtres, VilleInteret } from '../types';
 
 const STORAGE_KEY = 'notaires_app_data';
 const VERSION = '1.1.0';
@@ -51,6 +51,7 @@ function isValidFiltres(filtres: any): filtres is Filtres {
     typeof filtres.minSalaries !== 'number' ||
     typeof filtres.maxSalaries !== 'number' ||
     typeof filtres.showOnlyWithEmail !== 'boolean' ||
+    typeof filtres.showNonContactes !== 'boolean' ||
     typeof filtres.showOnlyInRadius !== 'boolean' ||
     !Array.isArray(filtres.statuts) ||
     !Array.isArray(filtres.contactStatuts) ||

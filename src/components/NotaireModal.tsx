@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Fragment, Dispatch, SetStateAction } from 'react';
+import React, { useState, useEffect, Fragment, Dispatch, SetStateAction } from 'react';
 import { Notaire, NotaireStatut, AdresseSuggestion } from '../types';
 import { geocodeSingleNotaire } from '../services/geocoding';
 import { searchAdresse } from '../services/adresse';
@@ -91,12 +91,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, l
 };
 
 const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEditing, setIsEditing }) => {
-  // Vérifier que le notaire a un ID valide
-  if (!notaire.id) {
-    console.error('Notaire sans ID reçu dans NotaireModal');
-    return null;
-  }
-
+  // ✅ TOUS LES HOOKS DOIVENT ÊTRE APPELÉS EN PREMIER
   const [editedNotaire, setEditedNotaire] = useState<Notaire>(notaire);
   const [activeTab, setActiveTab] = useState<'info' | 'contacts'>('info');
   const [geocodingStatus, setGeocodingStatus] = useState<string>('');
@@ -127,6 +122,12 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     const timeoutId = setTimeout(searchAdresses, 300);
     return () => clearTimeout(timeoutId);
   }, [editedNotaire.adresse]);
+
+  // ✅ VÉRIFICATIONS CONDITIONNELLES APRÈS LES HOOKS
+  if (!notaire.id) {
+    console.error('Notaire sans ID reçu dans NotaireModal');
+    return null;
+  }
 
   const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;

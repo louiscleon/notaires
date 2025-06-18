@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Notaire, Filtres, NotaireStatut } from './types';
 import MapComponent from './components/MapComponent';
 import NotaireModal from './components/NotaireModal';
@@ -9,7 +9,6 @@ import { storageService } from './services/storage';
 import './App.css';
 import Dashboard from './components/Dashboard';
 import Toast from './components/Toast';
-import { geocodeAddress } from './services/geocoding';
 import Logo from './components/Logo';
 import { notaireService } from './services/notaireService';
 
@@ -199,12 +198,18 @@ const App: React.FC = () => {
         }
       } else if (filtres.showNonContactes) {
         // Seulement les non contactés
-        if (hasContacts) return false;
+        if (hasContacts) {
+          return false;
+        }
       } else if (filtres.contactStatuts.length > 0) {
         // Seulement ceux avec les statuts de contact spécifiés
-        if (!hasContacts) return false;
+        if (!hasContacts) {
+          return false;
+        }
         const dernierContact = notaire.contacts[notaire.contacts.length - 1];
-        if (!filtres.contactStatuts.includes(dernierContact.statut)) return false;
+        if (!filtres.contactStatuts.includes(dernierContact.statut)) {
+          return false;
+        }
       }
 
       // Filtre par rayon des villes d'intérêt
@@ -235,6 +240,26 @@ const App: React.FC = () => {
     });
 
     console.log('Notaires filtrés:', filtered.length);
+    
+    // Debug simple pour les filtres de contact
+    if (filtres.showNonContactes || filtres.contactStatuts.length > 0) {
+      const nonContactes = filtered.filter(n => !n.contacts || n.contacts.length === 0);
+      const contactes = filtered.filter(n => n.contacts && n.contacts.length > 0);
+      console.log(`📊 Résumé filtrage contact:`);
+      console.log(`  - showNonContactes: ${filtres.showNonContactes}`);
+      console.log(`  - contactStatuts: [${filtres.contactStatuts.join(', ')}]`);
+      console.log(`  - Non contactés dans résultat: ${nonContactes.length}`);
+      console.log(`  - Contactés dans résultat: ${contactes.length}`);
+      
+      if (contactes.length > 0) {
+        const statutsPresents = contactes.map(n => {
+          const dernierContact = n.contacts[n.contacts.length - 1];
+          return dernierContact.statut;
+        });
+        console.log(`  - Statuts présents: [${Array.from(new Set(statutsPresents)).join(', ')}]`);
+      }
+    }
+    
     return filtered;
   }, [notaires, filtres]);
 
@@ -246,26 +271,6 @@ const App: React.FC = () => {
     setFiltres(newFiltres);
     storageService.saveFiltres(newFiltres);
   };
-
-  // Synchroniser avant de quitter la page
-  useEffect(() => {
-    const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '';
-      
-      try {
-        // Forcer la sauvegarde de toutes les modifications en attente
-        await notaireService.syncWithGoogleSheets();
-      } catch (error) {
-        console.error('Erreur lors de la synchronisation finale:', error);
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, []);
 
   // Synchroniser périodiquement (moins fréquemment pour éviter les conflits)
   useEffect(() => {
@@ -376,12 +381,50 @@ const App: React.FC = () => {
           isMenuOpen={isMenuOpen}
         />
 
+        {/* TEST TEMPORAIRE - À SUPPRIMER */}
+        <div className="p-4 bg-yellow-100 border border-yellow-300 rounded-lg m-4">
+          <p className="text-sm font-medium text-yellow-800 mb-2">🧪 Tests de filtrage (temporaire) :</p>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => {
+                console.log('🧪 TEST: Activation filtre non contactés');
+                setFiltres({...filtres, showNonContactes: true, contactStatuts: []});
+              }}
+              className="px-3 py-1 bg-gray-600 text-white rounded text-sm"
+            >
+              Tester Non contactés
+            </button>
+            <button
+              onClick={() => {
+                console.log('🧪 TEST: Réinitialisation filtres');
+                setFiltres({...filtres, showNonContactes: false, contactStatuts: []});
+              }}
+              className="px-3 py-1 bg-red-600 text-white rounded text-sm"
+            >
+              Reset filtres contact
+            </button>
+            <button
+              onClick={() => {
+                console.log('🧪 TEST: Filtrage mail envoyé');
+                setFiltres({...filtres, showNonContactes: false, contactStatuts: ['mail_envoye']});
+              }}
+              className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
+            >
+              Tester Mail envoyé
+            </button>
+          </div>
+          <p className="text-xs text-yellow-700 mt-1">
+            Filtres actuels: showNonContactes={filtres.showNonContactes ? 'true' : 'false'}, 
+            contactStatuts=[{filtres.contactStatuts.join(', ')}]
+          </p>
+        </div>
+
         <div className="p-4 lg:p-8">
           {viewMode === 'carte' ? (
             <div className="space-y-4 lg:space-y-8">
               <div className="bg-white rounded-lg shadow-lg p-4">
                 <Dashboard 
-                  notaires={notaires} 
+                  notaires={notairesFiltres} 
                   onNotaireClick={handleNotaireClick}
                 />
               </div>
@@ -411,7 +454,7 @@ const App: React.FC = () => {
             <div className="space-y-4 lg:space-y-8">
               <div className="bg-white rounded-lg shadow-lg p-4">
                 <Dashboard 
-                  notaires={notaires}
+                  notaires={notairesFiltres}
                   onNotaireClick={handleNotaireClick}
                 />
               </div>

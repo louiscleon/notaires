@@ -26,28 +26,12 @@ function isValidVilleInteretData(data: any[]): boolean {
   return Array.isArray(data) && data.length >= 7;
 }
 
-// Types pour la gestion des erreurs
-class RetryableError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'RetryableError';
-  }
-}
-
 // Fonction utilitaire pour attendre
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Type guard pour les erreurs
 function isError(error: unknown): error is Error {
   return error instanceof Error;
-}
-
-// Fonction utilitaire pour créer une erreur
-function createError(error: unknown): Error {
-  if (isError(error)) {
-    return error;
-  }
-  return new Error(typeof error === 'string' ? error : 'An unknown error occurred');
 }
 
 // Fonction utilitaire pour retry
@@ -331,7 +315,7 @@ export const googleSheetsService = {
         }),
       });
 
-      const data = await parseJsonResponse(response);
+      await parseJsonResponse(response);
     } catch (error) {
       throw error;
     }

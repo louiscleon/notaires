@@ -2,7 +2,6 @@ import React, { useState, useEffect, Fragment } from 'react';
 import { Notaire, Contact, ContactStatut } from '../types';
 import { Listbox, Transition } from '@headlessui/react';
 import { ChevronUpDownIcon } from '@heroicons/react/24/solid';
-import { googleSheetsService } from '../services/googleSheets';
 import { notaireService } from '../services/notaireService';
 
 interface Props {
