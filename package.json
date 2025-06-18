@@ -27,10 +27,13 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "DISABLE_ESLINT_PLUGIN=true react-scripts build",
+    "build": "DISABLE_ESLINT_PLUGIN=true react-scripts build && npm run remove-console-logs",
+    "build:clean": "DISABLE_ESLINT_PLUGIN=true GENERATE_SOURCEMAP=false react-scripts build && npm run remove-console-logs",
+    "remove-console-logs": "find build/static/js -name '*.js' -exec sed -i '' '/console\\./d' {} + 2>/dev/null || true",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "serve": "serve -s build"
+    "serve": "serve -s build",
+    "analyze": "npm run build && npx bundle-analyzer build/static/js/*.js"
   },
   "eslintConfig": {
     "extends": [
