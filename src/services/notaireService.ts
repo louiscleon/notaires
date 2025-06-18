@@ -1,6 +1,6 @@
 import { Notaire, VilleInteret } from '../types';
 import { googleSheetsService } from './googleSheets';
-import { autoSaveService } from './autoSave';
+// import { autoSaveService } from './autoSave'; // **DÉSACTIVÉ TEMPORAIREMENT**
 
 // **VALIDATION SIMPLIFIEE ET ROBUSTE**
 function isValidNotaire(notaire: any): notaire is Notaire {
@@ -162,7 +162,7 @@ class NotaireService {
     return this.notaires.find(n => n.id === id);
   }
 
-  // **MISE A JOUR AVEC SAUVEGARDE AUTOMATIQUE PROTÉGÉE**
+  // **RETOUR À LA SAUVEGARDE DIRECTE SÉCURISÉE**
   async updateNotaire(updatedNotaire: Notaire): Promise<void> {
     if (!this.isInitialized) {
       throw new Error('❌ Service non initialisé');
@@ -182,28 +182,32 @@ class NotaireService {
       throw new Error(`Notaire avec l'ID ${updatedNotaire.id} non trouvé`);
     }
 
+    const previousNotaire = { ...this.notaires[index] };
+
     try {
       console.log(`💾 Mise à jour du notaire: ${updatedNotaire.officeNotarial}`);
       
-      // **HORODATAGE AUTOMATIQUE**
+      // **HORODATAGE SIMPLE**
       const timestampedNotaire = {
         ...updatedNotaire,
         dateModification: new Date().toISOString()
       };
       
-      // **MISE A JOUR IMMEDIATE DE L'ETAT LOCAL**
+      // **MISE A JOUR LOCALE IMMEDIATE**
       this.notaires[index] = { ...timestampedNotaire };
       
-      // **NOTIFICATION IMMEDIATE POUR UNE MEILLEURE UX**
+      // **NOTIFICATION IMMEDIATE**
       this.notifySubscribers();
 
-      // **SAUVEGARDE AUTOMATIQUE PROTÉGÉE**
+      // **SAUVEGARDE DIRECTE - PLUS SÛRE**
       try {
-        await autoSaveService.scheduleAutoSave(timestampedNotaire);
-        console.log(`✅ Sauvegarde planifiée pour: ${timestampedNotaire.officeNotarial}`);
+        await googleSheetsService.saveToSheet(timestampedNotaire);
+        console.log(`✅ Notaire sauvegardé: ${timestampedNotaire.officeNotarial}`);
       } catch (saveError) {
-        console.error(`❌ Erreur planification sauvegarde (données locales conservées):`, saveError);
-        // On ne restaure pas l'ancien état pour une meilleure UX
+        console.error(`❌ Erreur sauvegarde (restauration état précédent):`, saveError);
+        // **RESTAURATION EN CAS D'ERREUR**
+        this.notaires[index] = previousNotaire;
+        this.notifySubscribers();
         throw saveError;
       }
       
@@ -221,9 +225,6 @@ class NotaireService {
 
     try {
       console.log(`🔄 Synchronisation avec Google Sheets...`);
-      
-      // **FORCER LA SAUVEGARDE DES MODIFICATIONS EN ATTENTE**
-      await autoSaveService.forceSave();
       
       // **RECHARGEMENT COMPLET DES DONNEES**
       const data = await googleSheetsService.loadFromSheet();
@@ -282,33 +283,20 @@ class NotaireService {
     }
   }
 
-  // **METHODES DE DEBUG ET MAINTENANCE**
+  // **METHODES DE DEBUG SIMPLIFIEES**
   getServiceStatus() {
-    const autoSaveStatus = autoSaveService.getQueueStatus();
     return {
       isInitialized: this.isInitialized,
       isLoading: this.isLoading,
       notairesCount: this.notaires.length,
       villesInteretCount: this.villesInteret.length,
-      subscribersCount: this.subscribers.length,
-      autoSave: {
-        pendingSaves: autoSaveStatus.pendingCount,
-        isSaving: autoSaveStatus.isSaving,
-        operations: autoSaveStatus.operations
-      }
+      subscribersCount: this.subscribers.length
     };
-  }
-
-  // **FORCER LA SAUVEGARDE DE TOUTES LES MODIFICATIONS EN ATTENTE**
-  async forceSaveAll(): Promise<void> {
-    console.log(`🔥 Sauvegarde forcée de toutes les modifications...`);
-    await autoSaveService.forceSave();
   }
 
   // Reset service (useful for testing)
   reset(): void {
     console.log(`🔄 Réinitialisation du service...`);
-    autoSaveService.clearQueue();
     this.notaires = [];
     this.villesInteret = [];
     this.subscribers = [];
