@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Notaire, Filtres, NotaireStatut } from '../types';
 import { notaireService } from '../services/notaireService';
 import { storageService } from '../services/storage';
@@ -11,57 +11,77 @@ export const useNotaires = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Charger les données initiales
+  // **CHARGEMENT INITIAL SIMPLIFIE**
   useEffect(() => {
     const loadData = async () => {
       try {
+        console.log('🚀 Initialisation du hook useNotaires...');
         setLoading(true);
         setError(null);
 
-        // Initialiser le service notaire
-        await notaireService.loadInitialData();
-        
-        // S'abonner aux changements
+        // **S'ABONNER AUX CHANGEMENTS AVANT LE CHARGEMENT**
         const unsubscribe = notaireService.subscribe((updatedNotaires, updatedVillesInteret) => {
+          console.log(`📊 Réception de ${updatedNotaires.length} notaires dans le hook`);
           setNotaires(updatedNotaires);
           setFiltres(prevFiltres => ({
             ...prevFiltres,
             villesInteret: updatedVillesInteret
           }));
+          
+          // **ARRETER LE LOADING QUAND ON REÇOIT LES DONNEES**
+          if (updatedNotaires.length > 0) {
+            setLoading(false);
+            console.log('✅ Données reçues, loading terminé');
+          }
         });
 
-        // Charger les filtres (sauf les villes d'intérêt qui viennent du service)
+        // **CHARGER LES FILTRES SAUVEGARDÉS**
         const savedData = storageService.loadData();
         setFiltres(prevFiltres => ({
           ...prevFiltres,
           ...savedData.filtres,
-          villesInteret: notaireService.getVillesInteret()
+          // Les villes d'intérêt viendront du service via l'abonnement
         }));
 
-        setLoading(false);
+        // **INITIALISER LE SERVICE**
+        await notaireService.loadInitialData();
+
         return unsubscribe;
       } catch (error) {
-        console.error('Erreur lors du chargement des données:', error);
-        setError('Une erreur est survenue lors du chargement des données. Veuillez réessayer.');
+        console.error('❌ Erreur lors du chargement des données:', error);
+        setError(error instanceof Error ? error.message : 'Erreur lors du chargement des données');
         setLoading(false);
       }
     };
 
-    loadData();
+    const unsubscribePromise = loadData();
+    
+    // **CLEANUP**
+    return () => {
+      unsubscribePromise.then(unsubscribe => {
+        if (unsubscribe) {
+          unsubscribe();
+        }
+      });
+    };
   }, []);
 
-  // Sauvegarder les filtres à chaque modification
+  // **SAUVEGARDER LES FILTRES AUTOMATIQUEMENT**
   useEffect(() => {
-    storageService.saveFiltres(filtres);
+    if (Object.keys(filtres).length > 0) {
+      storageService.saveFiltres(filtres);
+    }
   }, [filtres]);
 
-  // Synchroniser périodiquement
+  // **SYNCHRONISATION PERIODIQUE SIMPLIFIEE**
   useEffect(() => {
     const syncInterval = setInterval(async () => {
       try {
+        console.log('🔄 Synchronisation automatique...');
         await notaireService.syncWithGoogleSheets();
       } catch (error) {
-        console.error('Erreur lors de la synchronisation automatique:', error);
+        console.error('⚠️ Erreur synchronisation automatique (non critique):', error);
+        // Ne pas afficher d'erreur à l'utilisateur pour les sync automatiques
       }
     }, 300000); // 5 minutes
 
@@ -70,71 +90,65 @@ export const useNotaires = () => {
     };
   }, []);
 
+  // **SYNCHRONISATION MANUELLE**
   const synchronize = async () => {
     try {
       setIsSyncing(true);
+      console.log('🔄 Synchronisation manuelle demandée...');
       await notaireService.syncWithGoogleSheets();
       return { success: true, message: 'Synchronisation réussie' };
     } catch (error) {
-      console.error('Erreur lors de la synchronisation:', error);
-      return { success: false, message: 'Erreur lors de la synchronisation' };
+      console.error('❌ Erreur lors de la synchronisation manuelle:', error);
+      return { 
+        success: false, 
+        message: error instanceof Error ? error.message : 'Erreur lors de la synchronisation' 
+      };
     } finally {
       setIsSyncing(false);
     }
   };
 
+  // **MISE A JOUR DU STATUT**
   const handleStatutChange = async (notaire: Notaire, newStatut: NotaireStatut) => {
     try {
+      console.log(`🔄 Changement de statut pour ${notaire.officeNotarial}: ${newStatut}`);
       const updatedNotaire = { ...notaire, statut: newStatut };
       await notaireService.updateNotaire(updatedNotaire);
       return { success: true, message: 'Statut mis à jour avec succès' };
     } catch (error) {
-      console.error('Erreur lors de la mise à jour du statut:', error);
-      return { success: false, message: 'Erreur lors de la mise à jour du statut' };
+      console.error('❌ Erreur lors de la mise à jour du statut:', error);
+      return { 
+        success: false, 
+        message: error instanceof Error ? error.message : 'Erreur lors de la mise à jour du statut' 
+      };
     }
   };
 
+  // **MISE A JOUR D'UN NOTAIRE**
   const handleNotaireUpdate = async (updatedNotaire: Notaire) => {
     try {
-      // Mettre à jour l'état local immédiatement
-      setNotaires(prevNotaires => {
-        const index = prevNotaires.findIndex(n => n.id === updatedNotaire.id);
-        if (index === -1) return prevNotaires;
-        
-        const newNotaires = [...prevNotaires];
-        newNotaires[index] = updatedNotaire;
-        return newNotaires;
-      });
-
-      // Synchroniser avec le service
+      console.log(`💾 Mise à jour du notaire: ${updatedNotaire.officeNotarial}`);
       await notaireService.updateNotaire(updatedNotaire);
       return { success: true };
     } catch (error) {
-      console.error('Erreur lors de la mise à jour du notaire:', error);
-      
-      // Restaurer l'état précédent en cas d'erreur
-      setNotaires(prevNotaires => {
-        const originalNotaire = prevNotaires.find(n => n.id === updatedNotaire.id);
-        if (!originalNotaire) return prevNotaires;
-        
-        const index = prevNotaires.findIndex(n => n.id === updatedNotaire.id);
-        if (index === -1) return prevNotaires;
-        
-        const newNotaires = [...prevNotaires];
-        newNotaires[index] = originalNotaire;
-        return newNotaires;
-      });
-      
-      return { success: false, message: 'Erreur lors de la mise à jour du notaire' };
+      console.error('❌ Erreur lors de la mise à jour du notaire:', error);
+      return { 
+        success: false, 
+        message: error instanceof Error ? error.message : 'Erreur lors de la mise à jour du notaire' 
+      };
     }
   };
 
+  // **GESTION DES FILTRES**
   const handleFiltresChange = (newFiltres: Filtres) => {
+    console.log('🔧 Mise à jour des filtres');
     setFiltres(newFiltres);
     storageService.saveFiltres(newFiltres);
   };
 
+  // **RESET DES FILTRES**
   const clearAllFilters = () => {
+    console.log('🧹 Nettoyage de tous les filtres');
     const clearedFiltres: Filtres = {
       typeNotaire: 'tous',
       serviceNego: 'tous',
@@ -147,12 +161,20 @@ export const useNotaires = () => {
       contactStatuts: [],
       showNonContactes: false,
       showOnlyInRadius: false,
-      villesInteret: filtres.villesInteret,
+      villesInteret: filtres.villesInteret, // Garder les villes d'intérêt
     };
     setFiltres(clearedFiltres);
     setSearchQuery('');
     storageService.saveFiltres(clearedFiltres);
   };
+
+  // **INFORMATIONS DE DEBUG**
+  useEffect(() => {
+    if (!loading && !error) {
+      const status = notaireService.getServiceStatus();
+      console.log('📊 Status du service:', status);
+    }
+  }, [loading, error]);
 
   return {
     notaires,

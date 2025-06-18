@@ -6,10 +6,10 @@ interface SheetData {
   villesInteret: VilleInteret[];
 }
 
-// Configuration
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 1000; // 1 seconde
-const REQUEST_TIMEOUT = 30000; // 30 secondes
+// Configuration simplifiée
+const MAX_RETRIES = 2;
+const RETRY_DELAY = 1000;
+const REQUEST_TIMEOUT = 15000; // Réduit à 15 secondes
 
 // Définition des plages de cellules pour Google Sheets
 const SHEET_RANGES = {
@@ -17,65 +17,46 @@ const SHEET_RANGES = {
   VILLES_INTERET: 'VillesInteret!A2:G'
 } as const;
 
-// Validation des données
+// **VALIDATION PLUS PERMISSIVE**
 function isValidNotaireData(data: any[]): boolean {
-  return Array.isArray(data) && data.length >= 20;
+  return Array.isArray(data) && data.length >= 5; // Au lieu de 20, seulement 5 colonnes minimum
 }
 
 function isValidVilleInteretData(data: any[]): boolean {
-  return Array.isArray(data) && data.length >= 7;
+  return Array.isArray(data) && data.length >= 3; // Au lieu de 7, seulement 3 minimum
 }
 
-// Fonction utilitaire pour attendre
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Type guard pour les erreurs
-function isError(error: unknown): error is Error {
-  return error instanceof Error;
-}
-
-// Fonction utilitaire pour retry
-async function withRetry<T>(
-  operation: () => Promise<T>,
-  retries: number = MAX_RETRIES,
-  delay: number = RETRY_DELAY
-): Promise<T> {
+// **FONCTION DE RETRY SIMPLIFIEE**
+async function withRetry<T>(operation: () => Promise<T>, retries: number = MAX_RETRIES): Promise<T> {
   let attempt = 0;
-  let currentDelay = delay;
-
+  
   while (attempt <= retries) {
     try {
       return await operation();
     } catch (error: unknown) {
       if (attempt === retries) {
-        if (isError(error)) {
-          throw error;
-        }
-        throw new Error(String(error));
+        throw error;
       }
       
-      const message = isError(error) ? error.message : String(error);
-      console.log(`Attempt ${attempt + 1}/${retries} failed: ${message}`);
-      console.log(`Retrying in ${currentDelay}ms...`);
-      
-      await wait(currentDelay);
-      currentDelay *= 2;
+      console.log(`Tentative ${attempt + 1}/${retries + 1} échouée, retry dans ${RETRY_DELAY}ms...`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
       attempt++;
     }
   }
-
+  
   throw new Error('Unexpected error in retry logic');
 }
 
-async function fetchWithCors(url: string, options?: RequestInit): Promise<Response> {
+// **FETCH SIMPLIFIE**
+async function simpleFetch(url: string, options?: RequestInit): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
   try {
+    console.log(`🌐 Requête vers: ${url}`);
+    
     const response = await fetch(url, {
       ...options,
-      mode: 'cors',
-      credentials: 'include',
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
@@ -84,22 +65,18 @@ async function fetchWithCors(url: string, options?: RequestInit): Promise<Respon
       },
     });
 
+    console.log(`📊 Réponse: ${response.status} ${response.statusText}`);
+
     if (!response.ok) {
       const errorText = await response.text();
-      if (errorText.trim().startsWith('<!DOCTYPE html>')) {
-        throw new Error('API error: Server returned HTML instead of JSON. The server might be down.');
-      }
-      
-      throw new Error(`API error: ${response.status} - ${errorText}`);
+      console.error(`❌ Erreur API ${response.status}:`, errorText);
+      throw new Error(`API Error ${response.status}: ${errorText}`);
     }
 
     return response;
   } catch (error: unknown) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('API error: Request timed out');
-    }
-    if (error instanceof TypeError && error.message.includes('CORS')) {
-      throw new Error('API error: CORS issue - Please check API configuration');
+      throw new Error('Request timeout');
     }
     throw error;
   } finally {
@@ -107,207 +84,274 @@ async function fetchWithCors(url: string, options?: RequestInit): Promise<Respon
   }
 }
 
-async function parseJsonResponse(response: Response): Promise<any> {
-  const text = await response.text();
-  
+// **PARSING NOTAIRE SIMPLIFIE ET ROBUSTE**
+function parseNotaire(row: any[]): Notaire | null {
   try {
-    return JSON.parse(text);
-  } catch (error) {
-    throw new Error(`API error: Invalid JSON response - ${text}`);
-  }
-}
-
-// Système de queue simplifié
-let pendingSaves: Map<string, Notaire> = new Map();
-let saveTimeout: NodeJS.Timeout | null = null;
-let isSaving = false;
-
-// Fonction pour sauvegarder dans Google Sheets
-async function saveToSheetInternal(notaires: Notaire[]): Promise<void> {
-  if (notaires.length === 0) {
-    console.warn('No notaires to save');
-    return;
-  }
-
-  // Valider les données avant l'envoi
-  const validNotaires = notaires.filter(n => {
-    if (!n.id || !n.officeNotarial) {
-      console.warn('Invalid notaire data:', n);
-      return false;
-    }
-    return true;
-  });
-
-  if (validNotaires.length === 0) {
-    throw new Error('No valid notaires to save');
-  }
-
-  // Convertir les notaires en tableau de valeurs pour Google Sheets
-  const values = validNotaires.map(notaire => [
-    notaire.id,
-    notaire.officeNotarial,
-    notaire.adresse,
-    notaire.codePostal,
-    notaire.ville,
-    notaire.departement,
-    notaire.email,
-    notaire.notairesAssocies,
-    notaire.notairesSalaries,
-    notaire.nbAssocies,
-    notaire.nbSalaries,
-    notaire.serviceNego ? 'oui' : 'non',
-    notaire.statut,
-    notaire.notes,
-    JSON.stringify(notaire.contacts || []),
-    notaire.dateModification,
-    notaire.latitude,
-    notaire.longitude,
-    notaire.geoScore,
-    JSON.stringify(notaire.geocodingHistory || [])
-  ]);
-
-  console.log(`💾 Sauvegarde de ${validNotaires.length} notaire(s) dans Google Sheets...`);
-  
-  const timestamp = new Date().getTime();
-  
-  const response = await withRetry(
-    () => fetchWithCors(`${API_BASE_URL}/sheets`, {
-      method: 'POST',
-      body: JSON.stringify({ 
-        range: SHEET_RANGES.NOTAIRES,
-        values,
-        forceSync: true,
-        timestamp
-      }),
-    }),
-    3, // Réduire le nombre de tentatives
-    1000
-  );
-
-  const data = await parseJsonResponse(response);
-  
-  if (data.error) {
-    console.error('Erreur de réponse API:', data);
-    throw new Error(`API error: ${data.message || 'Failed to save to Google Sheets'}`);
-  }
-
-  console.log(`✅ ${validNotaires.length} notaire(s) sauvegardé(s) avec succès`);
-}
-
-// Fonction pour traiter les sauvegardes en attente
-async function processPendingSaves(): Promise<void> {
-  if (isSaving || pendingSaves.size === 0) {
-    return;
-  }
-
-  try {
-    isSaving = true;
-    const notairesToSave = Array.from(pendingSaves.values());
-    pendingSaves.clear();
+    console.log(`🔄 Parsing notaire:`, row.slice(0, 5)); // Log des 5 premières colonnes
     
-    await saveToSheetInternal(notairesToSave);
+    // **VALEURS PAR DEFAUT ROBUSTES**
+    const safeGet = (index: number, defaultValue: any = '') => {
+      return row[index] !== undefined && row[index] !== null ? row[index] : defaultValue;
+    };
+    
+    const safeGetNumber = (index: number, defaultValue: number = 0): number => {
+      const value = safeGet(index, defaultValue);
+      if (typeof value === 'number') return value;
+      const parsed = parseFloat(String(value).replace(',', '.'));
+      return isNaN(parsed) ? defaultValue : parsed;
+    };
+    
+    const safeGetBoolean = (index: number, defaultValue: boolean = false): boolean => {
+      const value = safeGet(index, defaultValue);
+      if (typeof value === 'boolean') return value;
+      const str = String(value).toLowerCase().trim();
+      return str === 'oui' || str === 'true' || str === '1';
+    };
+    
+    const id = safeGet(0) || `notaire_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const officeNotarial = safeGet(1);
+    
+    // **VALIDATION MINIMALE**
+    if (!officeNotarial) {
+      console.warn(`⚠️ Notaire sans office notarial, ignoré:`, row.slice(0, 3));
+      return null;
+    }
+    
+    // **PARSING STATUT ROBUSTE**
+    const rawStatut = String(safeGet(12, 'non_defini')).toLowerCase().trim();
+    let statut: NotaireStatut = 'non_defini';
+    
+    if (rawStatut.includes('favori')) statut = 'favori';
+    else if (rawStatut.includes('envisage') || rawStatut.includes('à envisager')) statut = 'envisage';
+    else if (rawStatut.includes('non') && (rawStatut.includes('interesse') || rawStatut.includes('intéresse'))) statut = 'non_interesse';
+    
+    // **PARSING CONTACTS SIMPLIFIE**
+    let contacts: Contact[] = [];
+    try {
+      const contactsRaw = safeGet(14, '[]');
+      if (contactsRaw && contactsRaw !== '[]') {
+        contacts = JSON.parse(contactsRaw);
+      }
+    } catch (error) {
+      console.warn('⚠️ Erreur parsing contacts, utilisation valeur par défaut');
+      contacts = [];
+    }
+    
+    // **PARSING GEOCODING HISTORY SIMPLIFIE**
+    let geocodingHistory: GeocodingHistory[] = [];
+    try {
+      const historyRaw = safeGet(19, '[]');
+      if (historyRaw && historyRaw !== '[]') {
+        geocodingHistory = JSON.parse(historyRaw);
+      }
+    } catch (error) {
+      console.warn('⚠️ Erreur parsing geocoding history, utilisation valeur par défaut');
+      geocodingHistory = [];
+    }
+    
+    const notaire: Notaire = {
+      id: String(id),
+      officeNotarial: String(officeNotarial),
+      departement: String(safeGet(5)),
+      nom: String(safeGet(1)).split(' ').slice(1).join(' '), // Nom après le prénom
+      prenom: String(safeGet(1)).split(' ')[0], // Premier mot comme prénom
+      adresse: String(safeGet(2)),
+      codePostal: String(safeGet(3)),
+      ville: String(safeGet(4)),
+      email: String(safeGet(6)),
+      statut,
+      notes: String(safeGet(13)),
+      latitude: safeGetNumber(16),
+      longitude: safeGetNumber(17),
+      needsGeocoding: false, // On simplifie pour l'instant
+      nbAssocies: safeGetNumber(9),
+      nbSalaries: safeGetNumber(10),
+      contacts,
+      dateModification: safeGet(15) ? new Date(safeGet(15)).toISOString() : new Date().toISOString(),
+      serviceNego: safeGetBoolean(11),
+      notairesAssocies: String(safeGet(7)),
+      notairesSalaries: String(safeGet(8)),
+      geoScore: safeGetNumber(18),
+      geocodingHistory,
+      geoStatus: 'success'
+    };
+    
+    console.log(`✅ Notaire parsé avec succès:`, { id: notaire.id, office: notaire.officeNotarial });
+    return notaire;
+    
   } catch (error) {
-    console.error('❌ Erreur lors de la sauvegarde:', error);
-    throw error;
-  } finally {
-    isSaving = false;
+    console.error(`❌ Erreur lors du parsing du notaire:`, error, 'Row:', row);
+    return null;
   }
 }
 
+// **PARSING VILLE SIMPLIFIE**
+function parseVilleInteret(row: any[]): VilleInteret | null {
+  try {
+    const safeGet = (index: number, defaultValue: any = '') => {
+      return row[index] !== undefined && row[index] !== null ? row[index] : defaultValue;
+    };
+    
+    const nom = safeGet(1);
+    if (!nom) {
+      console.warn(`⚠️ Ville sans nom, ignorée:`, row);
+      return null;
+    }
+    
+    return {
+      id: String(safeGet(0) || `ville_${Date.now()}`),
+      nom: String(nom),
+      rayon: Number(safeGet(2, 15)),
+      latitude: Number(String(safeGet(3, 0)).replace(',', '.')),
+      longitude: Number(String(safeGet(4, 0)).replace(',', '.')),
+      departement: String(safeGet(5)),
+      population: Number(safeGet(6, 0))
+    };
+    
+  } catch (error) {
+    console.error(`❌ Erreur lors du parsing de la ville:`, error, 'Row:', row);
+    return null;
+  }
+}
+
+// **SERVICE GOOGLE SHEETS SIMPLIFIE**
 export const googleSheetsService = {
   async loadFromSheet(): Promise<SheetData> {
+    console.log(`🚀 Chargement des données depuis Google Sheets...`);
+    
     return withRetry(async () => {
       try {
-        // Charger les notaires
-        const responseNotaires = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.NOTAIRES}`);
-        const dataNotaires = await parseJsonResponse(responseNotaires);
+        // **CHARGEMENT DES NOTAIRES**
+        console.log(`📊 Chargement des notaires...`);
+        const responseNotaires = await simpleFetch(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.NOTAIRES}`);
+        const rawNotaires = await responseNotaires.json();
         
-        if (!Array.isArray(dataNotaires)) {
-          throw new Error('API error: Invalid notaires data format');
-        }
-
-        const notaires = dataNotaires.map((row, index) => {
-          if (!isValidNotaireData(row)) {
-            console.warn(`Invalid notaire data at index ${index}:`, row);
-            return null;
-          }
-          try {
-            return parseNotaire(row);
-          } catch (error) {
-            console.error(`Error parsing notaire at index ${index}:`, error);
-            return null;
-          }
-        }).filter((n): n is Notaire => n !== null);
-
-        // Charger les villes d'intérêt
-        const responseVilles = await fetchWithCors(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.VILLES_INTERET}`);
-        const dataVilles = await parseJsonResponse(responseVilles);
+        console.log(`📊 Données brutes reçues:`, {
+          type: typeof rawNotaires,
+          isArray: Array.isArray(rawNotaires),
+          length: Array.isArray(rawNotaires) ? rawNotaires.length : 'N/A',
+          firstRow: Array.isArray(rawNotaires) && rawNotaires.length > 0 ? rawNotaires[0] : null
+        });
         
-        if (!Array.isArray(dataVilles)) {
-          throw new Error('API error: Invalid villes d\'intérêt data format');
+        if (!Array.isArray(rawNotaires)) {
+          console.error(`❌ Format de données invalide pour les notaires:`, rawNotaires);
+          throw new Error('Format de données invalide pour les notaires');
         }
-
-        const villesInteret = dataVilles.map((row, index) => {
-          if (!isValidVilleInteretData(row)) {
-            console.warn(`Invalid ville d'intérêt data at index ${index}:`, row);
-            return null;
+        
+        // **PARSING AVEC GESTION D'ERREUR ROBUSTE**
+        const notaires = rawNotaires
+          .filter((row, index) => {
+            if (!isValidNotaireData(row)) {
+              console.warn(`⚠️ Ligne ${index + 2} ignorée (données insuffisantes):`, row?.slice(0, 3));
+              return false;
+            }
+            return true;
+          })
+          .map((row, index) => {
+            try {
+              return parseNotaire(row);
+            } catch (error) {
+              console.error(`❌ Erreur parsing ligne ${index + 2}:`, error);
+              return null;
+            }
+          })
+          .filter((notaire): notaire is Notaire => notaire !== null);
+        
+        console.log(`✅ ${notaires.length} notaires chargés avec succès`);
+        
+        // **CHARGEMENT DES VILLES D'INTERET**
+        console.log(`🏙️ Chargement des villes d'intérêt...`);
+        let villesInteret: VilleInteret[] = [];
+        
+        try {
+          const responseVilles = await simpleFetch(`${API_BASE_URL}/sheets?range=${SHEET_RANGES.VILLES_INTERET}`);
+          const rawVilles = await responseVilles.json();
+          
+          if (Array.isArray(rawVilles)) {
+            villesInteret = rawVilles
+              .filter(row => isValidVilleInteretData(row))
+              .map(row => parseVilleInteret(row))
+              .filter((ville): ville is VilleInteret => ville !== null);
           }
-          try {
-            return parseVilleInteret(row);
-          } catch (error) {
-            console.error(`Error parsing ville d'intérêt at index ${index}:`, error);
-            return null;
-          }
-        }).filter((v): v is VilleInteret => v !== null);
-
+          
+          console.log(`✅ ${villesInteret.length} villes d'intérêt chargées`);
+        } catch (error) {
+          console.warn(`⚠️ Erreur chargement villes d'intérêt (non critique):`, error);
+          villesInteret = [];
+        }
+        
         if (notaires.length === 0) {
-          throw new Error('API error: No valid notaires data found');
+          throw new Error('Aucun notaire valide trouvé dans les données');
         }
-
+        
+        console.log(`🎉 Chargement terminé: ${notaires.length} notaires, ${villesInteret.length} villes`);
         return { notaires, villesInteret };
+        
       } catch (error) {
-        console.error('Error in loadFromSheet:', error);
+        console.error(`❌ Erreur lors du chargement des données:`, error);
         throw error;
       }
     });
   },
 
+  // **SAUVEGARDE SIMPLIFIEE SANS DEBOUNCE**
   async saveToSheet(notaire: Notaire | Notaire[]): Promise<void> {
     const notaires = Array.isArray(notaire) ? notaire : [notaire];
     
-    // Ajouter les notaires à la queue
-    notaires.forEach(n => {
-      if (n.id) {
-        pendingSaves.set(n.id, n);
+    console.log(`💾 Sauvegarde de ${notaires.length} notaire(s)...`);
+    
+    try {
+      // **CONVERSION EN FORMAT GOOGLE SHEETS**
+      const values = notaires.map(n => [
+        n.id,
+        n.officeNotarial,
+        n.adresse,
+        n.codePostal,
+        n.ville,
+        n.departement,
+        n.email,
+        n.notairesAssocies,
+        n.notairesSalaries,
+        n.nbAssocies,
+        n.nbSalaries,
+        n.serviceNego ? 'oui' : 'non',
+        n.statut,
+        n.notes,
+        JSON.stringify(n.contacts || []),
+        n.dateModification,
+        n.latitude,
+        n.longitude,
+        n.geoScore,
+        JSON.stringify(n.geocodingHistory || [])
+      ]);
+      
+      const response = await simpleFetch(`${API_BASE_URL}/sheets`, {
+        method: 'POST',
+        body: JSON.stringify({ 
+          range: SHEET_RANGES.NOTAIRES,
+          values
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (result.error) {
+        throw new Error(result.message || 'Erreur lors de la sauvegarde');
       }
-    });
-
-    // Annuler le timeout précédent
-    if (saveTimeout) {
-      clearTimeout(saveTimeout);
+      
+      console.log(`✅ Sauvegarde réussie`);
+      
+    } catch (error) {
+      console.error(`❌ Erreur lors de la sauvegarde:`, error);
+      throw error;
     }
-
-    // Programmer une sauvegarde dans 2 secondes (debounce)
-    saveTimeout = setTimeout(async () => {
-      try {
-        await processPendingSaves();
-      } catch (error) {
-        console.error('Erreur lors de la sauvegarde différée:', error);
-      }
-    }, 2000);
-  },
-
-  async forceSave(): Promise<void> {
-    if (saveTimeout) {
-      clearTimeout(saveTimeout);
-      saveTimeout = null;
-    }
-    await processPendingSaves();
   },
 
   async saveVillesInteret(villesInteret: VilleInteret[]): Promise<void> {
+    console.log(`🏙️ Sauvegarde de ${villesInteret.length} ville(s) d'intérêt...`);
+    
     try {
-      const response = await fetchWithCors(`${API_BASE_URL}/sheets/villes-interet`, {
+      const response = await simpleFetch(`${API_BASE_URL}/sheets/villes-interet`, {
         method: 'POST',
         body: JSON.stringify({ 
           villesInteret,
@@ -315,190 +359,25 @@ export const googleSheetsService = {
         }),
       });
 
-      await parseJsonResponse(response);
+      await response.json();
+      console.log(`✅ Villes d'intérêt sauvegardées`);
+      
     } catch (error) {
+      console.error(`❌ Erreur sauvegarde villes d'intérêt:`, error);
       throw error;
     }
   },
 
   async testConfig(): Promise<any> {
     try {
-      const response = await fetchWithCors(`${API_BASE_URL}/test`);
-      const data = await parseJsonResponse(response);
+      console.log(`🔧 Test de configuration API...`);
+      const response = await simpleFetch(`${API_BASE_URL}/test`);
+      const data = await response.json();
+      console.log(`✅ Configuration API OK`);
       return data;
     } catch (error) {
+      console.error(`❌ Erreur test configuration:`, error);
       throw error;
     }
   }
 };
-
-function parseNotaire(row: any[]): Notaire {
-  const [
-    id,
-    officeNotarial,
-    adresse,
-    codePostal,
-    ville,
-    departement,
-    email,
-    notairesAssocies,
-    notairesSalaries,
-    nbAssocies,
-    nbSalaries,
-    serviceNego,
-    statut,
-    notes,
-    contacts,
-    dateModification,
-    latitude,
-    longitude,
-    geoScore,
-    geocodingHistory
-  ] = row;
-
-  // Extraire le nom et le prénom de l'office notarial
-  const [prenom, ...nomParts] = (officeNotarial || '').split(' ');
-  const nom = nomParts.join(' ');
-
-  // Construire l'adresse complète pour la comparaison
-  const adresseComplete = `${adresse}, ${codePostal} ${ville}`.toLowerCase().trim();
-  
-  // Parser l'historique de géocodage
-  let parsedGeocodingHistory: GeocodingHistory[] = [];
-  try {
-    parsedGeocodingHistory = geocodingHistory ? JSON.parse(geocodingHistory) : [];
-  } catch (e) {
-    parsedGeocodingHistory = [];
-  }
-  
-  // Vérifier si l'adresse a changé en comparant avec l'historique de géocodage
-  const adresseAChange = !parsedGeocodingHistory || parsedGeocodingHistory.length === 0 || 
-    (parsedGeocodingHistory[parsedGeocodingHistory.length - 1]?.address?.toLowerCase().trim() !== adresseComplete);
-
-  // Déterminer si le géocodage est nécessaire
-  const shouldGeocode = !latitude || !longitude || adresseAChange;
-
-  // Fonction utilitaire pour parser les nombres
-  const parseNumber = (value: any): number | undefined => {
-    if (value === undefined || value === null || value === '') {
-      return undefined;
-    }
-    const cleanValue = String(value).trim().replace(/,/g, '.');
-    const num = Number(cleanValue);
-    return isNaN(num) ? undefined : num;
-  };
-
-  // Fonction utilitaire pour parser les coordonnées
-  const parseCoordinate = (value: any): number | undefined => {
-    if (value === undefined || value === null || value === '') {
-      return undefined;
-    }
-    // Remplacer la virgule par un point pour les nombres au format français
-    const cleanValue = String(value).trim().replace(/,/g, '.');
-    const num = Number(cleanValue);
-    if (!isNaN(num) && num >= -180 && num <= 180) {
-      return num;
-    }
-    return undefined;
-  };
-
-  // Fonction utilitaire pour parser les dates
-  const parseDate = (value: any): string => {
-    if (!value || value === '[]') return new Date().toISOString();
-    try {
-      return new Date(value).toISOString();
-    } catch {
-      return new Date().toISOString();
-    }
-  };
-
-  // Fonction utilitaire pour parser les contacts
-  const parseContacts = (value: any): Contact[] => {
-    if (!value || value === '[]') return [];
-    try {
-      if (Array.isArray(value)) return value;
-      if (typeof value === 'string') {
-        try {
-          return JSON.parse(value);
-        } catch {
-          return [{
-            date: new Date().toISOString(),
-            type: 'initial',
-            par: 'Fanny',
-            statut: 'mail_envoye',
-            reponseRecue: {
-              date: new Date().toISOString(),
-              positive: false,
-              commentaire: value
-            }
-          }];
-        }
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  };
-
-  const notaire: Notaire = {
-    id: id || `notaire_${Date.now()}`,
-    officeNotarial: officeNotarial || '',
-    departement: departement || '',
-    nom: nom || '',
-    prenom: prenom || '',
-    adresse: adresse || '',
-    codePostal: codePostal || '',
-    ville: ville || '',
-    email: email || '',
-    statut: (() => {
-      const normalizedStatut = String(statut || '').toLowerCase().trim();
-      
-      // Mapping des valeurs possibles vers les statuts valides
-      const statutMap: { [key: string]: NotaireStatut } = {
-        'favori': 'favori',
-        'favoris': 'favori',
-        'envisage': 'envisage',
-        'à envisager': 'envisage',
-        'a envisager': 'envisage',
-        'non interesse': 'non_interesse',
-        'non intéresse': 'non_interesse',
-        'non_interesse': 'non_interesse',
-        'non défini': 'non_defini',
-        'non defini': 'non_defini',
-        'non_defini': 'non_defini'
-      };
-
-      const finalStatut = statutMap[normalizedStatut] || 'non_defini';
-      return finalStatut;
-    })(),
-    notes: notes || '',
-    latitude: parseCoordinate(latitude) ?? 0,
-    longitude: parseCoordinate(longitude) ?? 0,
-    needsGeocoding: Boolean(shouldGeocode),
-    nbAssocies: parseNumber(nbAssocies) || 0,
-    nbSalaries: parseNumber(nbSalaries) || 0,
-    contacts: parseContacts(contacts),
-    dateModification: parseDate(dateModification),
-    serviceNego: serviceNego === 'oui',
-    notairesAssocies: notairesAssocies || '',
-    notairesSalaries: notairesSalaries || '',
-    geoScore: parseNumber(geoScore),
-    geocodingHistory: parsedGeocodingHistory,
-    geoStatus: shouldGeocode ? 'pending' : 'success'
-  };
-
-  return notaire;
-}
-
-function parseVilleInteret(row: any[]): VilleInteret {
-  // Colonnes attendues : ID, Nom, Rayon, Latitude, Longitude, Département, Population
-  return {
-    id: row[0] || '',
-    nom: row[1] || '',
-    rayon: Number(row[2]) || 15,
-    latitude: row[3] ? Number(String(row[3]).replace(',', '.')) : 0,
-    longitude: row[4] ? Number(String(row[4]).replace(',', '.')) : 0,
-    departement: row[5] || '',
-    population: row[6] ? Number(row[6]) : undefined
-  };
-}

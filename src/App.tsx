@@ -10,9 +10,11 @@ import ActiveFiltersDisplay from './components/ActiveFiltersDisplay';
 import Dashboard from './components/Dashboard';
 import Toast from './components/Toast';
 import Logo from './components/Logo';
+import DebugPanel from './components/DebugPanel';
 import { useToast } from './hooks/useToast';
 import { useNotaires } from './hooks/useNotaires';
 import { useNotairesFilters } from './hooks/useNotairesFilters';
+import { testApiConnection } from './debug/testApi';
 import './App.css';
 
 const App: React.FC = () => {
@@ -65,6 +67,12 @@ const App: React.FC = () => {
     setSelectedNotaire(null);
   };
 
+  // **TEST API EN CAS D'ERREUR**
+  const handleTestApi = async () => {
+    console.log('🧪 Test API déclenché manuellement...');
+    await testApiConnection();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 to-white">
@@ -77,7 +85,14 @@ const App: React.FC = () => {
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-teal-500 border-t-transparent mx-auto"></div>
           </div>
           <p className="mt-6 text-gray-600 text-lg">Chargement de vos données...</p>
+          <button 
+            onClick={handleTestApi}
+            className="mt-4 text-sm text-gray-500 hover:text-gray-700 underline"
+          >
+            Test API (console)
+          </button>
         </div>
+        <DebugPanel />
       </div>
     );
   }
@@ -89,13 +104,22 @@ const App: React.FC = () => {
           <div className="text-6xl mb-6">😕</div>
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Oups !</h2>
           <p className="text-gray-600 text-lg mb-6">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-indigo-600 text-white px-6 py-3 rounded-lg text-lg font-medium hover:bg-indigo-700 transition-colors duration-200 shadow-md hover:shadow-lg"
-          >
-            Réessayer
-          </button>
+          <div className="space-x-4">
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-indigo-600 text-white px-6 py-3 rounded-lg text-lg font-medium hover:bg-indigo-700 transition-colors duration-200 shadow-md hover:shadow-lg"
+            >
+              Réessayer
+            </button>
+            <button
+              onClick={handleTestApi}
+              className="bg-gray-600 text-white px-6 py-3 rounded-lg text-lg font-medium hover:bg-gray-700 transition-colors duration-200 shadow-md hover:shadow-lg"
+            >
+              Test API
+            </button>
+          </div>
         </div>
+        <DebugPanel />
       </div>
     );
   }
@@ -233,6 +257,9 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Debug Panel */}
+      <DebugPanel />
     </div>
   );
 };

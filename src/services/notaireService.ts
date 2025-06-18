@@ -1,18 +1,15 @@
 import { Notaire, NotaireStatut, VilleInteret } from '../types';
 import { googleSheetsService } from './googleSheets';
 
-// Validation des données
+// **VALIDATION SIMPLIFIEE ET ROBUSTE**
 function isValidNotaire(notaire: any): notaire is Notaire {
   return (
     typeof notaire === 'object' &&
     notaire !== null &&
     typeof notaire.id === 'string' &&
+    notaire.id.length > 0 &&
     typeof notaire.officeNotarial === 'string' &&
-    typeof notaire.adresse === 'string' &&
-    typeof notaire.codePostal === 'string' &&
-    typeof notaire.ville === 'string' &&
-    typeof notaire.statut === 'string' &&
-    ['favori', 'envisage', 'non_interesse', 'non_defini'].includes(notaire.statut as NotaireStatut)
+    notaire.officeNotarial.length > 0
   );
 }
 
@@ -22,10 +19,7 @@ function isValidVilleInteret(ville: any): ville is VilleInteret {
     ville !== null &&
     typeof ville.id === 'string' &&
     typeof ville.nom === 'string' &&
-    typeof ville.rayon === 'number' &&
-    typeof ville.latitude === 'number' &&
-    typeof ville.longitude === 'number' &&
-    typeof ville.departement === 'string'
+    ville.nom.length > 0
   );
 }
 
@@ -34,6 +28,7 @@ class NotaireService {
   private villesInteret: VilleInteret[] = [];
   private subscribers: ((notaires: Notaire[], villesInteret: VilleInteret[]) => void)[] = [];
   private isInitialized: boolean = false;
+  private isLoading: boolean = false;
 
   // Singleton instance
   private static instance: NotaireService;
@@ -51,7 +46,12 @@ class NotaireService {
   // Subscribe to changes
   subscribe(callback: (notaires: Notaire[], villesInteret: VilleInteret[]) => void) {
     this.subscribers.push(callback);
-    callback(this.notaires, this.villesInteret); // Initial call with current data
+    
+    // Si déjà initialisé, appeler immédiatement avec les données actuelles
+    if (this.isInitialized) {
+      callback(this.notaires, this.villesInteret);
+    }
+    
     return () => {
       this.subscribers = this.subscribers.filter(cb => cb !== callback);
     };
@@ -59,161 +59,240 @@ class NotaireService {
 
   // Notify all subscribers
   private notifySubscribers() {
-    this.subscribers.forEach(callback => callback(this.notaires, this.villesInteret));
+    console.log(`🔔 Notification de ${this.subscribers.length} abonnés avec ${this.notaires.length} notaires`);
+    this.subscribers.forEach(callback => {
+      try {
+        callback([...this.notaires], [...this.villesInteret]);
+      } catch (error) {
+        console.error('❌ Erreur lors de la notification d\'un abonné:', error);
+      }
+    });
   }
 
-  // Load initial data
+  // **CHARGEMENT INITIAL SIMPLIFIE**
   async loadInitialData(): Promise<void> {
     if (this.isInitialized) {
-      console.warn('NotaireService is already initialized');
+      console.log('📊 Service déjà initialisé, utilisation des données en cache');
+      this.notifySubscribers();
+      return;
+    }
+
+    if (this.isLoading) {
+      console.log('⏳ Chargement déjà en cours...');
       return;
     }
 
     try {
+      this.isLoading = true;
+      console.log(`🚀 Initialisation du service notaires...`);
+      
       const data = await googleSheetsService.loadFromSheet();
       
-      // Valider les notaires
+      console.log(`📊 Données reçues: ${data.notaires.length} notaires, ${data.villesInteret.length} villes`);
+      
+      // **VALIDATION AVEC LOGS DETAILLES**
       const validNotaires = data.notaires.filter(notaire => {
         if (!isValidNotaire(notaire)) {
-          console.warn('Invalid notaire data:', notaire);
+          console.warn(`⚠️ Notaire invalide ignoré:`, { 
+            id: (notaire as any)?.id, 
+            office: (notaire as any)?.officeNotarial 
+          });
           return false;
         }
         return true;
       });
 
-      // Valider les villes d'intérêt
       const validVillesInteret = data.villesInteret.filter(ville => {
         if (!isValidVilleInteret(ville)) {
-          console.warn('Invalid ville d\'intérêt data:', ville);
+          console.warn(`⚠️ Ville d'intérêt invalide ignorée:`, { 
+            id: (ville as any)?.id, 
+            nom: (ville as any)?.nom 
+          });
           return false;
         }
         return true;
       });
 
       if (validNotaires.length === 0) {
-        throw new Error('No valid notaires found in the data');
+        throw new Error('❌ Aucun notaire valide trouvé dans les données');
       }
 
       this.notaires = validNotaires;
       this.villesInteret = validVillesInteret;
       this.isInitialized = true;
+      
+      console.log(`✅ Service initialisé: ${this.notaires.length} notaires, ${this.villesInteret.length} villes`);
+      
       this.notifySubscribers();
+      
     } catch (error) {
-      console.error('Error loading initial data:', error);
+      console.error('❌ Erreur lors du chargement initial:', error);
       this.isInitialized = false;
       throw error;
+    } finally {
+      this.isLoading = false;
     }
   }
 
   // Get all notaires
   getNotaires(): Notaire[] {
     if (!this.isInitialized) {
-      console.warn('NotaireService is not initialized');
+      console.warn('⚠️ Service non initialisé lors de getNotaires()');
+      return [];
     }
-    return this.notaires;
+    return [...this.notaires];
   }
 
   // Get all villes d'intérêt
   getVillesInteret(): VilleInteret[] {
     if (!this.isInitialized) {
-      console.warn('NotaireService is not initialized');
+      console.warn('⚠️ Service non initialisé lors de getVillesInteret()');
+      return [];
     }
-    return this.villesInteret;
+    return [...this.villesInteret];
   }
 
   // Get a single notaire by ID
   getNotaireById(id: string): Notaire | undefined {
     if (!this.isInitialized) {
-      console.warn('NotaireService is not initialized');
+      console.warn('⚠️ Service non initialisé lors de getNotaireById()');
+      return undefined;
     }
     return this.notaires.find(n => n.id === id);
   }
 
-  // Update a notaire - simplified version
+  // **MISE A JOUR SIMPLIFIEE**
   async updateNotaire(updatedNotaire: Notaire): Promise<void> {
     if (!this.isInitialized) {
-      throw new Error('NotaireService is not initialized');
+      throw new Error('❌ Service non initialisé');
     }
 
     if (!isValidNotaire(updatedNotaire)) {
-      console.error('Données de notaire invalides:', updatedNotaire);
-      throw new Error('Invalid notaire data');
+      console.error('❌ Données de notaire invalides:', {
+        id: (updatedNotaire as any)?.id,
+        office: (updatedNotaire as any)?.officeNotarial
+      });
+      throw new Error('Données de notaire invalides');
     }
 
     const index = this.notaires.findIndex(n => n.id === updatedNotaire.id);
     if (index === -1) {
-      console.error('Notaire non trouvé:', updatedNotaire.id);
-      throw new Error(`Notaire with ID ${updatedNotaire.id} not found`);
+      console.error('❌ Notaire non trouvé:', updatedNotaire.id);
+      throw new Error(`Notaire avec l'ID ${updatedNotaire.id} non trouvé`);
     }
 
     try {
-      // Update the modification date
+      console.log(`💾 Mise à jour du notaire: ${updatedNotaire.officeNotarial}`);
+      
+      // **MISE A JOUR IMMEDIATE DE L'ETAT LOCAL**
       updatedNotaire.dateModification = new Date().toISOString();
-
-      // Update local state immediately
-      this.notaires[index] = updatedNotaire;
+      this.notaires[index] = { ...updatedNotaire };
+      
+      // **NOTIFICATION IMMEDIATE POUR UNE MEILLEURE UX**
       this.notifySubscribers();
 
-      // Save to Google Sheets (with debounce)
-      await googleSheetsService.saveToSheet(updatedNotaire);
+      // **SAUVEGARDE EN ARRIERE-PLAN**
+      try {
+        await googleSheetsService.saveToSheet(updatedNotaire);
+        console.log(`✅ Notaire sauvegardé: ${updatedNotaire.officeNotarial}`);
+      } catch (saveError) {
+        console.error(`❌ Erreur sauvegarde (données locales conservées):`, saveError);
+        // On ne restaure pas l'ancien état pour une meilleure UX
+        // L'utilisateur voit sa modification même si la sauvegarde échoue
+        throw saveError;
+      }
+      
     } catch (error) {
-      console.error(`Erreur lors de la mise à jour du notaire ${updatedNotaire.id}:`, error);
+      console.error(`❌ Erreur lors de la mise à jour du notaire ${updatedNotaire.id}:`, error);
       throw error;
     }
   }
 
-  // Force sync with Google Sheets - simplified
+  // **SYNCHRONISATION SIMPLIFIEE**
   async syncWithGoogleSheets(): Promise<void> {
     if (!this.isInitialized) {
-      throw new Error('NotaireService is not initialized');
+      throw new Error('❌ Service non initialisé');
     }
 
     try {
-      // Force save any pending changes
-      await googleSheetsService.forceSave();
+      console.log(`🔄 Synchronisation avec Google Sheets...`);
+      
+      // **RECHARGEMENT COMPLET DES DONNEES**
+      const data = await googleSheetsService.loadFromSheet();
+      
+      const validNotaires = data.notaires.filter(isValidNotaire);
+      const validVillesInteret = data.villesInteret.filter(isValidVilleInteret);
+      
+      this.notaires = validNotaires;
+      this.villesInteret = validVillesInteret;
+      
+      console.log(`✅ Synchronisation terminée: ${this.notaires.length} notaires`);
+      
+      this.notifySubscribers();
+      
     } catch (error) {
-      console.error('Erreur lors de la synchronisation:', error);
+      console.error('❌ Erreur lors de la synchronisation:', error);
       throw error;
     }
   }
 
-  // Update villes d'intérêt
+  // **MISE A JOUR VILLES D'INTERET SIMPLIFIEE**
   async updateVillesInteret(villesInteret: VilleInteret[]): Promise<void> {
     if (!this.isInitialized) {
-      throw new Error('NotaireService is not initialized');
+      throw new Error('❌ Service non initialisé');
     }
 
-    // Valider les données
-    const validVillesInteret = villesInteret.filter(isValidVilleInteret);
-    if (validVillesInteret.length === 0 && villesInteret.length > 0) {
-      throw new Error('No valid villes d\'intérêt in the data');
-    }
+    console.log(`🏙️ Mise à jour de ${villesInteret.length} villes d'intérêt...`);
+
+    // **VALIDATION SIMPLIFIEE**
+    const validVillesInteret = villesInteret.filter(ville => {
+      if (!isValidVilleInteret(ville)) {
+        console.warn(`⚠️ Ville invalide ignorée:`, ville);
+        return false;
+      }
+      return true;
+    });
 
     const previousVillesInteret = [...this.villesInteret];
 
     try {
-      // Mettre à jour l'état local
+      // **MISE A JOUR LOCALE IMMEDIATE**
       this.villesInteret = validVillesInteret;
+      this.notifySubscribers();
       
-      // Synchroniser avec Google Sheets
+      // **SAUVEGARDE EN ARRIERE-PLAN**
       await googleSheetsService.saveVillesInteret(validVillesInteret);
       
-      // Notifier les abonnés après la synchronisation réussie
-      this.notifySubscribers();
+      console.log(`✅ Villes d'intérêt mises à jour`);
+      
     } catch (error) {
-      // Restaurer l'état précédent en cas d'erreur
+      console.error(`❌ Erreur sauvegarde villes d'intérêt:`, error);
+      // **RESTAURATION EN CAS D'ERREUR**
       this.villesInteret = previousVillesInteret;
       this.notifySubscribers();
       throw error;
     }
   }
 
+  // **METHODES DE DEBUG ET MAINTENANCE**
+  getServiceStatus() {
+    return {
+      isInitialized: this.isInitialized,
+      isLoading: this.isLoading,
+      notairesCount: this.notaires.length,
+      villesInteretCount: this.villesInteret.length,
+      subscribersCount: this.subscribers.length
+    };
+  }
+
   // Reset service (useful for testing)
   reset(): void {
+    console.log(`🔄 Réinitialisation du service...`);
     this.notaires = [];
     this.villesInteret = [];
     this.subscribers = [];
     this.isInitialized = false;
+    this.isLoading = false;
   }
 }
 
