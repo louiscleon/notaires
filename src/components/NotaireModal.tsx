@@ -129,46 +129,19 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
     return null;
   }
 
-  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    
-    // S'assurer que l'ID est toujours présent
-    if (!editedNotaire.id) {
-      console.error('ID du notaire manquant');
-      setSaveError('Erreur : ID du notaire manquant');
-      return;
-    }
-
+  const handleInputChange = async (name: keyof Notaire, value: any) => {
     const updatedNotaire = {
       ...editedNotaire,
       [name]: value,
-      id: editedNotaire.id, // Forcer l'ID à être conservé
-      dateModification: new Date().toISOString() // Mettre à jour la date de modification
+      dateModification: new Date().toISOString()
     };
+    
+    setEditedNotaire(updatedNotaire);
 
     try {
-      // Mettre à jour l'état local
-      setEditedNotaire(updatedNotaire);
-      console.log(`Début de la mise à jour du champ ${name} pour le notaire ${updatedNotaire.id}`);
-
-      // Synchroniser avec Google Sheets via le service notaire
-      await notaireService.updateNotaire(updatedNotaire);
-      
-      // Mettre à jour l'état parent
-      onSave(updatedNotaire);
-
-      console.log(`Champ ${name} mis à jour et synchronisé avec succès pour le notaire ${updatedNotaire.id}`);
-      setSaveError(null); // Effacer les erreurs précédentes
+      await onSave(updatedNotaire);
     } catch (error) {
-      console.error('Erreur lors de la synchronisation:', error);
-      setSaveError('Erreur lors de la sauvegarde. Veuillez réessayer.');
-      
-      // Restaurer l'état précédent en cas d'erreur
-      setEditedNotaire(notaire);
-    }
-
-    if (name === 'adresse') {
-      setShowSuggestions(true);
+      console.error(`Erreur lors de la mise à jour du champ ${name}:`, error);
     }
   };
 
@@ -231,8 +204,6 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       
       // Mettre à jour l'état parent
       onSave(updatedNotaire);
-
-      console.log(`Case à cocher ${name} mise à jour et synchronisée: ${checked}`);
     } catch (error) {
       console.error('Erreur lors de la synchronisation:', error);
       setSaveError('Erreur lors de la sauvegarde. Veuillez réessayer.');
@@ -263,7 +234,6 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       // Mettre à jour l'état parent
       onSave(updatedNotaire);
 
-      console.log(`Statut mis à jour et synchronisé: ${value}`);
       setSaveError(null);
     } catch (error) {
       console.error('Erreur lors de la synchronisation:', error);
@@ -297,7 +267,6 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
       const hasChanges = JSON.stringify(notaire) !== JSON.stringify(editedNotaire);
       
       if (hasChanges) {
-        console.log('Modifications détectées, synchronisation avant fermeture...');
         // Synchroniser avec Google Sheets avant de fermer
         await notaireService.updateNotaire(editedNotaire);
         // Mettre à jour l'état parent
@@ -409,7 +378,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                                 type="text"
                                 name="adresse"
                                 value={editedNotaire.adresse}
-                                onChange={handleInputChange}
+                                onChange={(e) => handleInputChange('adresse', e.target.value)}
                                 className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 transition-colors duration-200"
                               />
                               {showSuggestions && adresseSuggestions.length > 0 && (
@@ -435,7 +404,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                                   type="text"
                                   name="codePostal"
                                   value={editedNotaire.codePostal}
-                                  onChange={handleInputChange}
+                                  onChange={(e) => handleInputChange('codePostal', e.target.value)}
                                   className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 transition-colors duration-200"
                                 />
                               </div>
@@ -447,7 +416,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                                   type="text"
                                   name="ville"
                                   value={editedNotaire.ville}
-                                  onChange={handleInputChange}
+                                  onChange={(e) => handleInputChange('ville', e.target.value)}
                                   className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 transition-colors duration-200"
                                 />
                               </div>
@@ -460,7 +429,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                                 type="email"
                                 name="email"
                                 value={editedNotaire.email || ''}
-                                onChange={handleInputChange}
+                                onChange={(e) => handleInputChange('email', e.target.value)}
                                 className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 transition-colors duration-200"
                               />
                             </div>
@@ -480,14 +449,14 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                                 type="number"
                                 name="nbAssocies"
                                 value={editedNotaire.nbAssocies}
-                                onChange={handleInputChange}
+                                onChange={(e) => handleInputChange('nbAssocies', e.target.value)}
                                 className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 mb-2 transition-colors duration-200"
                               />
                               <input
                                 type="text"
                                 name="notairesAssocies"
                                 value={editedNotaire.notairesAssocies}
-                                onChange={handleInputChange}
+                                onChange={(e) => handleInputChange('notairesAssocies', e.target.value)}
                                 className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 transition-colors duration-200"
                               />
                             </div>
@@ -499,14 +468,14 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                                 type="number"
                                 name="nbSalaries"
                                 value={editedNotaire.nbSalaries}
-                                onChange={handleInputChange}
+                                onChange={(e) => handleInputChange('nbSalaries', e.target.value)}
                                 className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 mb-2 transition-colors duration-200"
                               />
                               <input
                                 type="text"
                                 name="notairesSalaries"
                                 value={editedNotaire.notairesSalaries}
-                                onChange={handleInputChange}
+                                onChange={(e) => handleInputChange('notairesSalaries', e.target.value)}
                                 className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 transition-colors duration-200"
                               />
                             </div>
@@ -541,7 +510,7 @@ const NotaireModal: React.FC<Props> = ({ isOpen, onClose, notaire, onSave, isEdi
                           <textarea
                             name="notes"
                             value={editedNotaire.notes || ''}
-                            onChange={handleInputChange}
+                            onChange={(e) => handleInputChange('notes', e.target.value)}
                             placeholder="Ajouter des notes..."
                             className="w-full h-[calc(100vh-28rem)] rounded-lg border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 resize-none transition-colors duration-200"
                           />

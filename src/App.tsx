@@ -47,22 +47,12 @@ const App: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        
-        console.log('🔄 Début du chargement des données...');
 
         // Initialiser le service notaire
         await notaireService.loadInitialData();
         
-        console.log('✅ Service notaire initialisé');
-        console.log('📊 Notaires chargés:', notaireService.getNotaires().length);
-        console.log('🏘️ Villes d\'intérêt chargées:', notaireService.getVillesInteret().length);
-        
         // S'abonner aux changements
         const unsubscribe = notaireService.subscribe((updatedNotaires, updatedVillesInteret) => {
-          console.log('🔔 Notification de changement de données:');
-          console.log('  - Notaires:', updatedNotaires.length);
-          console.log('  - Villes d\'intérêt:', updatedVillesInteret.length);
-          
           setNotaires(updatedNotaires);
           setFiltres(prevFiltres => ({
             ...prevFiltres,
@@ -72,8 +62,6 @@ const App: React.FC = () => {
 
         // Charger les filtres (sauf les villes d'intérêt qui viennent du service)
         const savedData = storageService.loadData();
-        console.log('💾 Filtres sauvegardés:', savedData.filtres);
-        
         setFiltres(prevFiltres => ({
           ...prevFiltres,
           ...savedData.filtres,
@@ -83,7 +71,7 @@ const App: React.FC = () => {
         setLoading(false);
         return unsubscribe;
       } catch (error) {
-        console.error('❌ Erreur lors du chargement des données:', error);
+        console.error('Erreur lors du chargement des données:', error);
         setError('Une erreur est survenue lors du chargement des données. Veuillez réessayer.');
         setLoading(false);
       }
@@ -159,39 +147,11 @@ const App: React.FC = () => {
   };
 
   const notairesFiltres = useMemo(() => {
-    console.log('=== FILTERING NOTAIRES ===');
-    console.log('Total notaires:', notaires.length);
-    console.log('Filtres actifs:', {
-      typeNotaire: filtres.typeNotaire,
-      serviceNego: filtres.serviceNego,
-      statuts: filtres.statuts,
-      contactStatuts: filtres.contactStatuts,
-      showNonContactes: filtres.showNonContactes,
-      showOnlyWithEmail: filtres.showOnlyWithEmail,
-      showOnlyInRadius: filtres.showOnlyInRadius,
-      searchQuery: searchQuery
-    });
-
     if (notaires.length === 0) {
-      console.log('⚠️ PROBLÈME: Aucun notaire à filtrer!');
       return [];
     }
 
-    let filteredCount = notaires.length;
-    console.log(`Étape 0: ${filteredCount} notaires au départ`);
-
-    const filtered = notaires.filter((notaire: Notaire, index) => {
-      // Log du premier notaire pour debug
-      if (index === 0) {
-        console.log('🔍 Premier notaire pour debug:', {
-          id: notaire.id,
-          nom: notaire.officeNotarial,
-          hasContacts: notaire.contacts && notaire.contacts.length > 0,
-          contactsLength: notaire.contacts ? notaire.contacts.length : 0,
-          statut: notaire.statut
-        });
-      }
-
+    const filtered = notaires.filter((notaire: Notaire) => {
       // Filtre par recherche textuelle
       if (searchQuery) {
         const searchTerms = searchQuery.toLowerCase().split(' ');
@@ -206,121 +166,66 @@ const App: React.FC = () => {
         `.toLowerCase();
 
         const matchesSearch = searchTerms.every(term => searchableText.includes(term));
-        if (!matchesSearch) {
-          if (index === 0) console.log(`❌ Étape 1: Premier notaire éliminé par recherche`);
-          return false;
-        }
+        if (!matchesSearch) return false;
       }
-      if (index === 0) console.log(`✅ Étape 1: Premier notaire passe la recherche`);
 
       // Filtre par type de notaire
       if (filtres.typeNotaire !== 'tous') {
         const estGroupe = notaire.nbAssocies > 1;
-        if (filtres.typeNotaire === 'individuels' && estGroupe) {
-          if (index === 0) console.log(`❌ Étape 2: Premier notaire éliminé par type (groupe)`);
-          return false;
-        }
-        if (filtres.typeNotaire === 'groupes' && !estGroupe) {
-          if (index === 0) console.log(`❌ Étape 2: Premier notaire éliminé par type (individuel)`);
-          return false;
-        }
+        if (filtres.typeNotaire === 'individuels' && estGroupe) return false;
+        if (filtres.typeNotaire === 'groupes' && !estGroupe) return false;
       }
-      if (index === 0) console.log(`✅ Étape 2: Premier notaire passe le type`);
 
       // Filtre par service négociation
       if (filtres.serviceNego !== 'tous') {
-        if (filtres.serviceNego === 'oui' && !notaire.serviceNego) {
-          if (index === 0) console.log(`❌ Étape 3: Premier notaire éliminé par service nego (pas de service)`);
-          return false;
-        }
-        if (filtres.serviceNego === 'non' && notaire.serviceNego) {
-          if (index === 0) console.log(`❌ Étape 3: Premier notaire éliminé par service nego (a le service)`);
-          return false;
-        }
+        if (filtres.serviceNego === 'oui' && !notaire.serviceNego) return false;
+        if (filtres.serviceNego === 'non' && notaire.serviceNego) return false;
       }
-      if (index === 0) console.log(`✅ Étape 3: Premier notaire passe le service nego`);
 
       // Filtre par nombre d'associés et salariés
-      if (notaire.nbAssocies < filtres.minAssocies || notaire.nbAssocies > filtres.maxAssocies) {
-        if (index === 0) console.log(`❌ Étape 4: Premier notaire éliminé par nb associés (${notaire.nbAssocies} pas dans [${filtres.minAssocies}, ${filtres.maxAssocies}])`);
-        return false;
-      }
-      if (notaire.nbSalaries < filtres.minSalaries || notaire.nbSalaries > filtres.maxSalaries) {
-        if (index === 0) console.log(`❌ Étape 4: Premier notaire éliminé par nb salariés (${notaire.nbSalaries} pas dans [${filtres.minSalaries}, ${filtres.maxSalaries}])`);
-        return false;
-      }
-      if (index === 0) console.log(`✅ Étape 4: Premier notaire passe les nombres`);
+      if (notaire.nbAssocies < filtres.minAssocies || notaire.nbAssocies > filtres.maxAssocies) return false;
+      if (notaire.nbSalaries < filtres.minSalaries || notaire.nbSalaries > filtres.maxSalaries) return false;
 
       // Filtre par statut du notaire
-      if (filtres.statuts.length > 0 && !filtres.statuts.includes(notaire.statut)) {
-        if (index === 0) console.log(`❌ Étape 5: Premier notaire éliminé par statut (${notaire.statut} pas dans [${filtres.statuts.join(', ')}])`);
-        return false;
-      }
-      if (index === 0) console.log(`✅ Étape 5: Premier notaire passe le statut`);
+      if (filtres.statuts.length > 0 && !filtres.statuts.includes(notaire.statut)) return false;
 
       // Filtre par email
-      if (filtres.showOnlyWithEmail && !notaire.email) {
-        if (index === 0) console.log(`❌ Étape 6: Premier notaire éliminé par email (pas d'email)`);
-        return false;
-      }
-      if (index === 0) console.log(`✅ Étape 6: Premier notaire passe l'email`);
+      if (filtres.showOnlyWithEmail && !notaire.email) return false;
 
       // Filtre par statut de contact - logique simplifiée
       const hasContacts = notaire.contacts && notaire.contacts.length > 0;
-      
-      if (index === 0) {
-        console.log(`🔍 Debug contacts pour premier notaire:`, {
-          hasContacts,
-          showNonContactes: filtres.showNonContactes,
-          contactStatuts: filtres.contactStatuts,
-          contactsData: notaire.contacts
-        });
-      }
 
       // Si on veut voir les non contactés ET qu'il y a des statuts de contact sélectionnés
       if (filtres.showNonContactes && filtres.contactStatuts.length > 0) {
         // Afficher les non contactés OU ceux qui correspondent aux statuts
         if (!hasContacts) {
           // Non contacté - OK
-          if (index === 0) console.log(`✅ Étape 7: Premier notaire passe (non contacté + showNonContactes)`);
         } else {
           // A des contacts - vérifier le statut du dernier contact
           const dernierContact = notaire.contacts[notaire.contacts.length - 1];
           if (!filtres.contactStatuts.includes(dernierContact.statut)) {
-            if (index === 0) console.log(`❌ Étape 7: Premier notaire éliminé par statut contact (${dernierContact.statut} pas dans [${filtres.contactStatuts.join(', ')}])`);
             return false;
           }
-          if (index === 0) console.log(`✅ Étape 7: Premier notaire passe (contacté avec bon statut)`);
         }
       } else if (filtres.showNonContactes) {
         // Seulement les non contactés
         if (hasContacts) {
-          if (index === 0) console.log(`❌ Étape 7: Premier notaire éliminé (a des contacts mais on veut seulement non contactés)`);
           return false;
         }
-        if (index === 0) console.log(`✅ Étape 7: Premier notaire passe (non contacté)`);
       } else if (filtres.contactStatuts.length > 0) {
         // Seulement ceux avec les statuts de contact spécifiés
         if (!hasContacts) {
-          if (index === 0) console.log(`❌ Étape 7: Premier notaire éliminé (pas de contacts mais on veut des statuts spécifiques)`);
           return false;
         }
         const dernierContact = notaire.contacts[notaire.contacts.length - 1];
         if (!filtres.contactStatuts.includes(dernierContact.statut)) {
-          if (index === 0) console.log(`❌ Étape 7: Premier notaire éliminé par statut contact (${dernierContact.statut} pas dans [${filtres.contactStatuts.join(', ')}])`);
           return false;
         }
-        if (index === 0) console.log(`✅ Étape 7: Premier notaire passe (contacté avec bon statut)`);
-      } else {
-        if (index === 0) console.log(`✅ Étape 7: Premier notaire passe (pas de filtre contact)`);
       }
 
       // Filtre par rayon des villes d'intérêt
       if (filtres.showOnlyInRadius && filtres.villesInteret.length > 0) {
-        if (!notaire.latitude || !notaire.longitude) {
-          if (index === 0) console.log(`❌ Étape 8: Premier notaire éliminé par rayon (pas de coordonnées)`);
-          return false;
-        }
+        if (!notaire.latitude || !notaire.longitude) return false;
 
         const estDansRayon = filtres.villesInteret.some(ville => {
           if (!ville.latitude || !ville.longitude) return false;
@@ -339,17 +244,11 @@ const App: React.FC = () => {
           return distance <= ville.rayon;
         });
 
-        if (!estDansRayon) {
-          if (index === 0) console.log(`❌ Étape 8: Premier notaire éliminé par rayon (hors zone)`);
-          return false;
-        }
+        if (!estDansRayon) return false;
       }
-      if (index === 0) console.log(`✅ Étape 8: Premier notaire passe le rayon`);
 
       return true;
     });
-
-    console.log('Notaires filtrés:', filtered.length);
     
     return filtered;
   }, [notaires, filtres, searchQuery]);
@@ -368,7 +267,6 @@ const App: React.FC = () => {
     const syncInterval = setInterval(async () => {
       try {
         await notaireService.syncWithGoogleSheets();
-        console.log('Synchronisation automatique effectuée');
       } catch (error) {
         console.error('Erreur lors de la synchronisation automatique:', error);
       }

@@ -147,22 +147,17 @@ class NotaireService {
     }
 
     try {
-      console.log(`🔄 Mise à jour du notaire ${updatedNotaire.id}...`);
-      
       // Update the modification date
       updatedNotaire.dateModification = new Date().toISOString();
 
       // Update local state immediately
       this.notaires[index] = updatedNotaire;
       this.notifySubscribers();
-      console.log(`✅ État local mis à jour pour ${updatedNotaire.id}`);
 
       // Save to Google Sheets (with debounce)
       await googleSheetsService.saveToSheet(updatedNotaire);
-      
-      console.log(`✨ Mise à jour programmée pour ${updatedNotaire.id}`);
     } catch (error) {
-      console.error(`❌ Erreur lors de la mise à jour du notaire ${updatedNotaire.id}:`, error);
+      console.error(`Erreur lors de la mise à jour du notaire ${updatedNotaire.id}:`, error);
       throw error;
     }
   }
@@ -174,14 +169,10 @@ class NotaireService {
     }
 
     try {
-      console.log('🔄 Synchronisation forcée avec Google Sheets...');
-      
       // Force save any pending changes
       await googleSheetsService.forceSave();
-      
-      console.log('✅ Synchronisation forcée réussie');
     } catch (error) {
-      console.error('❌ Erreur lors de la synchronisation:', error);
+      console.error('Erreur lors de la synchronisation:', error);
       throw error;
     }
   }

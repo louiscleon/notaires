@@ -214,8 +214,6 @@ const MapComponent: React.FC<Props> = ({
       notairesValides = notairesValides.filter(notaire => isNotaireInRadius(notaire, villesInteret));
     }
 
-    // Log essentiel pour vérifier que la recherche fonctionne
-    console.log('🗺️ Notaires sur la carte:', notairesValides.length, 'sur', notaires.length, 'reçus');
     return notairesValides;
   }, [notaires, showOnlyInRadius, villesInteret, isNotaireInRadius]);
 
