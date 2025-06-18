@@ -104,8 +104,6 @@ const MapComponent: React.FC<Props> = ({
   const geocodingRef = useRef<boolean>(false);
   const initialGeocodingDone = useRef<boolean>(false);
 
-  console.log('🗺️ MapComponent: Rendu avec', notaires.length, 'notaires reçus');
-
   // Configuration des icônes mémorisée
   const iconConfigs = useMemo(() => ({
     favori: {
@@ -179,19 +177,17 @@ const MapComponent: React.FC<Props> = ({
       );
 
       if (notairesAGeocoder.length > 0) {
-        console.log('🗺️ MapComponent: Géocodage de', notairesAGeocoder.length, 'notaires en arrière-plan');
         geocodingRef.current = true;
         setLoading(true);
 
         geocodeBatch(notairesAGeocoder, onNotaireUpdate || (() => {}))
           .then(() => {
-            console.log('🗺️ MapComponent: Géocodage terminé');
             geocodingRef.current = false;
             setLoading(false);
             initialGeocodingDone.current = true;
           })
           .catch(error => {
-            console.error('🗺️ MapComponent: Erreur de géocodage:', error);
+            console.error('🗺️ Erreur de géocodage:', error);
             geocodingRef.current = false;
             setLoading(false);
           });
@@ -213,28 +209,15 @@ const MapComponent: React.FC<Props> = ({
       n.longitude !== 0
     );
 
-    console.log('🗺️ MapComponent: Notaires avec coordonnées valides:', notairesValides.length);
-
     // Appliquer le filtre de rayon si nécessaire
     if (showOnlyInRadius && villesInteret.length > 0) {
       notairesValides = notairesValides.filter(notaire => isNotaireInRadius(notaire, villesInteret));
-      console.log('🗺️ MapComponent: Notaires dans le rayon:', notairesValides.length);
     }
 
-    console.log('🗺️ MapComponent: Notaires finaux à afficher:', notairesValides.length);
+    // Log essentiel pour vérifier que la recherche fonctionne
+    console.log('🗺️ Notaires sur la carte:', notairesValides.length, 'sur', notaires.length, 'reçus');
     return notairesValides;
   }, [notaires, showOnlyInRadius, villesInteret, isNotaireInRadius]);
-
-  // Log détaillé des marqueurs avant le rendu
-  console.log('🗺️ MapComponent: Avant rendu JSX:', {
-    notairesToDisplayLength: notairesToDisplay.length,
-    premiers3Notaires: notairesToDisplay.slice(0, 3).map(n => ({
-      id: n.id,
-      nom: n.officeNotarial,
-      lat: n.latitude,
-      lon: n.longitude
-    }))
-  });
 
   return (
     <div className="space-y-4">
@@ -251,7 +234,6 @@ const MapComponent: React.FC<Props> = ({
         )}
 
         <MapContainer
-          key={`map-${notairesToDisplay.length}`}
           center={center}
           zoom={initialZoom}
           className="w-full h-full"
@@ -298,7 +280,6 @@ const MapComponent: React.FC<Props> = ({
               // Vérification des coordonnées
               if (!notaire.latitude || !notaire.longitude || 
                   isNaN(notaire.latitude) || isNaN(notaire.longitude)) {
-                console.warn('🗺️ Coordonnées invalides pour notaire:', notaire.id, notaire.latitude, notaire.longitude);
                 return null;
               }
 

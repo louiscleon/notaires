@@ -69,7 +69,6 @@ const NotairesTable: React.FC<Props> = ({ notaires, onNotaireClick, selectedNota
 
   const renderMobileCard = (notaire: Notaire) => (
     <div
-      key={notaire.id}
       onClick={() => onNotaireClick(notaire)}
       className={`bg-white rounded-xl shadow-sm p-4 space-y-3 touch-card ${
         selectedNotaire?.id === notaire.id ? 'ring-2 ring-teal-500' : ''
@@ -114,7 +113,11 @@ const NotairesTable: React.FC<Props> = ({ notaires, onNotaireClick, selectedNota
     <div className="space-y-4">
       {/* Vue mobile en cartes */}
       <div className="md:hidden space-y-3">
-        {notaires.map(renderMobileCard)}
+        {notaires.map((notaire, index) => (
+          <div key={`mobile-${notaire.id}`}>
+            {renderMobileCard(notaire)}
+          </div>
+        ))}
       </div>
 
       {/* Vue desktop en tableau */}

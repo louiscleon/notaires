@@ -489,60 +489,6 @@ const App: React.FC = () => {
             />
           </div>
 
-          {/* 🔍 PANEL DE DEBUG TEMPORAIRE */}
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <h3 className="text-sm font-bold text-red-800 mb-2">🔍 DEBUG - État des données</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              <div className="bg-white p-2 rounded">
-                <strong>Données brutes:</strong>
-                <br />• Total notaires: {notaires.length}
-                <br />• Premiers 3 IDs: {notaires.slice(0, 3).map(n => n.id).join(', ')}
-                <br />• Recherche: "{searchQuery}"
-              </div>
-              <div className="bg-white p-2 rounded">
-                <strong>Filtres actifs:</strong>
-                <br />• showNonContactes: {filtres.showNonContactes ? 'OUI' : 'NON'}
-                <br />• contactStatuts: [{filtres.contactStatuts.join(', ')}]
-                <br />• statuts: [{filtres.statuts.join(', ')}]
-                <br />• typeNotaire: {filtres.typeNotaire}
-              </div>
-              <div className="bg-white p-2 rounded">
-                <strong>Résultats:</strong>
-                <br />• Notaires filtrés: {notairesFiltres.length}
-                <br />• Avec contacts: {notairesFiltres.filter(n => n.contacts && n.contacts.length > 0).length}
-                <br />• Sans contacts: {notairesFiltres.filter(n => !n.contacts || n.contacts.length === 0).length}
-              </div>
-            </div>
-            <div className="mt-2 flex space-x-2">
-              <button
-                onClick={() => console.log('📊 NOTAIRES BRUTS:', notaires)}
-                className="px-2 py-1 bg-blue-600 text-white rounded text-xs"
-              >
-                Log notaires bruts
-              </button>
-              <button
-                onClick={() => console.log('🔍 NOTAIRES FILTRÉS:', notairesFiltres)}
-                className="px-2 py-1 bg-green-600 text-white rounded text-xs"
-              >
-                Log notaires filtrés
-              </button>
-              <button
-                onClick={() => {
-                  console.log('📋 EXEMPLE DE NOTAIRE AVEC CONTACTS:');
-                  const avecContacts = notaires.find(n => n.contacts && n.contacts.length > 0);
-                  if (avecContacts) {
-                    console.log(avecContacts);
-                  } else {
-                    console.log('Aucun notaire avec contacts trouvé');
-                  }
-                }}
-                className="px-2 py-1 bg-purple-600 text-white rounded text-xs"
-              >
-                Log exemple avec contacts
-              </button>
-            </div>
-          </div>
-
           {viewMode === 'carte' ? (
             <div className="space-y-4 lg:space-y-8">
               <div className="bg-white rounded-lg shadow-lg p-4">
