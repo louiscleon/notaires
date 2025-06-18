@@ -172,6 +172,11 @@ const MapComponent: React.FC<Props> = ({
 
   // Effect pour gérer les notaires avec et sans coordonnées
   useEffect(() => {
+    console.log('🗺️ MapComponent: Mise à jour des notaires', {
+      notairesReçus: notaires.length,
+      notairesAvecCoordonneesActuels: notairesAvecCoordonnees.length
+    });
+
     // Mettre à jour la référence des notaires
     const notairesMap = new Map(notaires.map(n => [n.id, n]));
     notairesRef.current = notairesMap;
@@ -184,7 +189,9 @@ const MapComponent: React.FC<Props> = ({
       !isNaN(n.longitude)
     );
     
-    // Mettre à jour les notaires avec coordonnées
+    console.log('🗺️ MapComponent: Notaires valides avec coordonnées:', notairesValides.length);
+    
+    // Mettre à jour les notaires avec coordonnées IMMÉDIATEMENT
     setNotairesAvecCoordonnees(notairesValides);
 
     // Ne faire le géocodage que pour les notaires qui n'ont pas d'adresse ou dont l'adresse a changé
@@ -196,6 +203,7 @@ const MapComponent: React.FC<Props> = ({
       );
 
       if (notairesAGeocoder.length > 0) {
+        console.log('🗺️ MapComponent: Géocodage de', notairesAGeocoder.length, 'notaires');
         geocodingRef.current = true;
         setLoading(true);
 
@@ -234,8 +242,20 @@ const MapComponent: React.FC<Props> = ({
 
   // Filtrer les notaires selon le rayon si nécessaire
   const notairesToDisplay = useMemo(() => {
-    if (!showOnlyInRadius) return notairesAvecCoordonnees;
-    return notairesAvecCoordonnees.filter(notaire => isNotaireInRadius(notaire, villesInteret));
+    console.log('🗺️ MapComponent: Calcul des notaires à afficher', {
+      notairesAvecCoordonnees: notairesAvecCoordonnees.length,
+      showOnlyInRadius: showOnlyInRadius,
+      villesInteretCount: villesInteret.length
+    });
+
+    if (!showOnlyInRadius) {
+      console.log('🗺️ MapComponent: Affichage de tous les notaires avec coordonnées:', notairesAvecCoordonnees.length);
+      return notairesAvecCoordonnees;
+    }
+    
+    const filtered = notairesAvecCoordonnees.filter(notaire => isNotaireInRadius(notaire, villesInteret));
+    console.log('🗺️ MapComponent: Affichage des notaires dans le rayon:', filtered.length);
+    return filtered;
   }, [notairesAvecCoordonnees, showOnlyInRadius, villesInteret, isNotaireInRadius]);
 
   return (

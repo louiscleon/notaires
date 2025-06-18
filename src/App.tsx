@@ -474,7 +474,14 @@ const App: React.FC = () => {
 
         <div className="p-4 lg:p-8">
           {/* Barre de recherche globale */}
-          <div className="mb-4">
+          <div className="mb-4 bg-white rounded-lg shadow-lg p-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <span className="text-sm font-medium text-gray-700">Recherche globale</span>
+              <span className="text-xs text-gray-500">({notairesFiltres.length} résultat{notairesFiltres.length > 1 ? 's' : ''})</span>
+            </div>
             <SearchBar
               value={searchQuery}
               onChange={setSearchQuery}
