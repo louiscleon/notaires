@@ -225,6 +225,17 @@ const MapComponent: React.FC<Props> = ({
     return notairesValides;
   }, [notaires, showOnlyInRadius, villesInteret, isNotaireInRadius]);
 
+  // Log détaillé des marqueurs avant le rendu
+  console.log('🗺️ MapComponent: Avant rendu JSX:', {
+    notairesToDisplayLength: notairesToDisplay.length,
+    premiers3Notaires: notairesToDisplay.slice(0, 3).map(n => ({
+      id: n.id,
+      nom: n.officeNotarial,
+      lat: n.latitude,
+      lon: n.longitude
+    }))
+  });
+
   return (
     <div className="space-y-4">
       <div className="relative w-full h-full" style={{ zIndex: 0 }}>
@@ -240,6 +251,7 @@ const MapComponent: React.FC<Props> = ({
         )}
 
         <MapContainer
+          key={`map-${notairesToDisplay.length}`}
           center={center}
           zoom={initialZoom}
           className="w-full h-full"
@@ -280,29 +292,41 @@ const MapComponent: React.FC<Props> = ({
             ) : null
           )}
 
-          {notairesToDisplay.map((notaire) => (
-            <Marker
-              key={notaire.id}
-              position={[notaire.latitude as number, notaire.longitude as number]}
-              icon={createNotaireIcon(notaire.statut, notaire.geoScore)}
-              eventHandlers={{
-                click: () => onNotaireClick && onNotaireClick(notaire)
-              }}
-            >
-              <Popup>
-                <div className="p-2">
-                  <h3 className="font-bold text-lg">{notaire.officeNotarial}</h3>
-                  <p className="text-sm text-gray-600">{notaire.adresse}</p>
-                  <p className="text-sm text-gray-600">{notaire.codePostal} {notaire.ville}</p>
-                  {notaire.geoScore !== undefined && notaire.geoScore < 0.6 && (
-                    <p className="text-xs text-red-500 mt-1">
-                      ⚠️ Position approximative (score: {notaire.geoScore.toFixed(2)})
-                    </p>
-                  )}
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+          {/* Marqueurs des notaires */}
+          <React.Fragment key={`markers-${notairesToDisplay.length}`}>
+            {notairesToDisplay.map((notaire) => {
+              // Vérification des coordonnées
+              if (!notaire.latitude || !notaire.longitude || 
+                  isNaN(notaire.latitude) || isNaN(notaire.longitude)) {
+                console.warn('🗺️ Coordonnées invalides pour notaire:', notaire.id, notaire.latitude, notaire.longitude);
+                return null;
+              }
+
+              return (
+                <Marker
+                  key={`marker-${notaire.id}-${notaire.dateModification || 'no-date'}`}
+                  position={[notaire.latitude as number, notaire.longitude as number]}
+                  icon={createNotaireIcon(notaire.statut, notaire.geoScore)}
+                  eventHandlers={{
+                    click: () => onNotaireClick && onNotaireClick(notaire)
+                  }}
+                >
+                  <Popup>
+                    <div className="p-2">
+                      <h3 className="font-bold text-lg">{notaire.officeNotarial}</h3>
+                      <p className="text-sm text-gray-600">{notaire.adresse}</p>
+                      <p className="text-sm text-gray-600">{notaire.codePostal} {notaire.ville}</p>
+                      {notaire.geoScore !== undefined && notaire.geoScore < 0.6 && (
+                        <p className="text-xs text-red-500 mt-1">
+                          ⚠️ Position approximative (score: {notaire.geoScore.toFixed(2)})
+                        </p>
+                      )}
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
+          </React.Fragment>
         </MapContainer>
 
         <style>{`
