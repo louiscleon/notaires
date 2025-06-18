@@ -42,6 +42,16 @@ const DebugPanel: React.FC = () => {
     }
   };
 
+  const handleForceSave = async () => {
+    addLog('💾 Sauvegarde forcée...');
+    try {
+      await notaireService.forceSaveAll();
+      addLog('✅ Sauvegarde forcée terminée');
+    } catch (error) {
+      addLog(`❌ Sauvegarde forcée échouée: ${error}`);
+    }
+  };
+
   const handleResetService = () => {
     addLog('🔄 Réinitialisation du service...');
     notaireService.reset();
@@ -63,7 +73,7 @@ const DebugPanel: React.FC = () => {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 bg-white border border-gray-300 rounded-lg shadow-xl p-4 w-80 z-50 max-h-96 overflow-y-auto text-xs">
+    <div className="fixed bottom-4 right-4 bg-white border border-gray-300 rounded-lg shadow-xl p-4 w-96 z-50 max-h-[32rem] overflow-y-auto text-xs">
       <div className="flex justify-between items-center mb-3">
         <h3 className="font-bold text-sm">🐛 Debug Panel</h3>
         <button
@@ -88,6 +98,32 @@ const DebugPanel: React.FC = () => {
         )}
       </div>
 
+      {/* Status de Sauvegarde Automatique */}
+      {serviceStatus?.autoSave && (
+        <div className="mb-3 p-2 bg-green-50 rounded">
+          <div className="font-semibold mb-1">💾 Sauvegarde Auto:</div>
+          <div className="space-y-1">
+            <div>📝 En attente: {serviceStatus.autoSave.pendingSaves}</div>
+            <div>🔄 En cours: {serviceStatus.autoSave.isSaving ? '✅' : '❌'}</div>
+            {serviceStatus.autoSave.operations.length > 0 && (
+              <div className="mt-2">
+                <div className="font-medium text-xs">Opérations en cours:</div>
+                {serviceStatus.autoSave.operations.slice(0, 3).map((op: any) => (
+                  <div key={op.id} className="text-xs text-gray-600 truncate">
+                    • {op.officeNotarial} (tentative {op.attempts})
+                  </div>
+                ))}
+                {serviceStatus.autoSave.operations.length > 3 && (
+                  <div className="text-xs text-gray-500">
+                    ... et {serviceStatus.autoSave.operations.length - 3} autres
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="mb-3 space-y-2">
         <button
@@ -101,6 +137,13 @@ const DebugPanel: React.FC = () => {
           className="w-full bg-green-600 text-white p-2 rounded text-xs hover:bg-green-700"
         >
           🔄 Sync Manuel
+        </button>
+        <button
+          onClick={handleForceSave}
+          className="w-full bg-purple-600 text-white p-2 rounded text-xs hover:bg-purple-700"
+          disabled={!serviceStatus?.autoSave?.pendingSaves}
+        >
+          💾 Force Save ({serviceStatus?.autoSave?.pendingSaves || 0})
         </button>
         <button
           onClick={handleResetService}
@@ -131,6 +174,7 @@ const DebugPanel: React.FC = () => {
         <div className="font-semibold mb-1">🔧 Console:</div>
         <div>• <code>testApi()</code> - Test API</div>
         <div>• <code>notaireService.getServiceStatus()</code></div>
+        <div>• <code>notaireService.forceSaveAll()</code></div>
         <div>• <code>notaireService.getNotaires().length</code></div>
       </div>
     </div>

@@ -5,3 +5,6 @@ node_modules
 .env.local
 src/services/.env.local
 service-account-key.json
+DEBUG_INSTRUCTIONS.md
+DEBUG_INSTRUCTIONS.md
+OPTIMIZATION_SUMMARY.md

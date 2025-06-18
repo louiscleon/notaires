@@ -6,7 +6,7 @@ interface Props {
   onNotaireClick?: (notaire: Notaire) => void;
 }
 
-interface StatCard {
+interface StatCardData {
   title: string;
   value: number;
   description: string;
@@ -30,7 +30,7 @@ const StatCard: React.FC<{
 const Dashboard: React.FC<Props> = ({ notaires, onNotaireClick }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // CORRECTION : Dédupliquer les notaires par ID dès le début
+  // **DÉDUPLICATION ROBUSTE DES NOTAIRES**
   const notairesUniques = useMemo(() => {
     const uniqueMap = new Map<string, Notaire>();
     let duplicatesFound = 0;
@@ -48,11 +48,13 @@ const Dashboard: React.FC<Props> = ({ notaires, onNotaireClick }) => {
       console.warn(`⚠️ ${duplicatesFound} doublon(s) détecté(s) dans les données - dédupliqués automatiquement`);
     }
     
-    return Array.from(uniqueMap.values());
+    const result = Array.from(uniqueMap.values());
+    console.log(`📊 Dashboard: ${result.length} notaires uniques (${notaires.length} au départ)`);
+    return result;
   }, [notaires]);
 
   // Calcul des statistiques avec les notaires dédupliqués
-  const stats: StatCard[] = [
+  const stats: StatCardData[] = [
     {
       title: 'Total Notaires',
       value: notairesUniques.length,

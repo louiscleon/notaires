@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Notaire, GeocodingResult, GeocodingHistory } from '../types';
+import { Notaire, GeocodingResult } from '../types';
 
 const GEOCODING_CACHE_KEY = 'geocoding_cache';
 
@@ -209,7 +209,6 @@ export class GeocodingService {
       ...notaire,
       latitude: result.lat,
       longitude: result.lon,
-      display_name: result.display_name,
       geoScore: result.score,
       geoStatus: result.error ? 'error' : 'success',
       geocodingHistory: [...(notaire.geocodingHistory || []), history]

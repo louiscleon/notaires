@@ -7,7 +7,30 @@ export const useNotairesFilters = (notaires: Notaire[], filtres: Filtres, search
       return [];
     }
 
-    const filtered = notaires.filter((notaire: Notaire) => {
+    console.log(`🔍 Filtrage de ${notaires.length} notaires...`);
+
+    // **ÉTAPE 1: DÉDUPLICATION ROBUSTE**
+    const uniqueMap = new Map<string, Notaire>();
+    let duplicatesFound = 0;
+    
+    notaires.forEach(notaire => {
+      if (uniqueMap.has(notaire.id)) {
+        duplicatesFound++;
+        console.warn(`🔍 Doublon détecté et supprimé: ${notaire.officeNotarial} (ID: ${notaire.id})`);
+      } else {
+        uniqueMap.set(notaire.id, notaire);
+      }
+    });
+    
+    if (duplicatesFound > 0) {
+      console.warn(`⚠️ ${duplicatesFound} doublon(s) supprimé(s) automatiquement`);
+    }
+    
+    const notairesUniques = Array.from(uniqueMap.values());
+    console.log(`✅ ${notairesUniques.length} notaires uniques après déduplication`);
+
+    // **ÉTAPE 2: FILTRAGE**
+    const filtered = notairesUniques.filter((notaire: Notaire) => {
       // Filtre par recherche textuelle
       if (searchQuery) {
         const searchTerms = searchQuery.toLowerCase().split(' ');
@@ -105,6 +128,7 @@ export const useNotairesFilters = (notaires: Notaire[], filtres: Filtres, search
       return true;
     });
     
+    console.log(`🎯 ${filtered.length} notaires après filtrage`);
     return filtered;
   }, [notaires, filtres, searchQuery]);
 
